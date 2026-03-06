@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+
+# Specs (dev workflow)
+specs/
+.claude/
