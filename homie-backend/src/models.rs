@@ -908,6 +908,8 @@ pub struct Subscription {
     pub is_active: bool,
     pub note: Option<String>,
     pub created_at: String,
+    pub google_event_id: Option<String>,
+    pub sync_to_calendar: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -922,6 +924,7 @@ pub struct CreateSubscription {
     pub billing_day: i32,
     pub next_billing_date: String,
     pub note: Option<String>,
+    pub sync_to_calendar: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -937,6 +940,7 @@ pub struct UpdateSubscription {
     pub next_billing_date: Option<String>,
     pub is_active: Option<bool>,
     pub note: Option<String>,
+    pub sync_to_calendar: Option<bool>,
 }
 
 // ── Constructors ──
@@ -1168,6 +1172,8 @@ impl Subscription {
             is_active: true,
             note: input.note,
             created_at: chrono::Utc::now().to_rfc3339(),
+            google_event_id: None,
+            sync_to_calendar: input.sync_to_calendar.unwrap_or(true),
         }
     }
 }

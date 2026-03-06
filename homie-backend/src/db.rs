@@ -524,6 +524,27 @@ pub async fn init_db(pool: &SqlitePool) {
     .await
     .expect("Failed to create subscriptions table");
 
+    // ── Migration: Add google_event_id and sync_to_calendar to subscriptions ──
+    let has_google_event_id: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name = 'google_event_id'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false);
+
+    if !has_google_event_id {
+        sqlx::query("ALTER TABLE subscriptions ADD COLUMN google_event_id TEXT")
+            .execute(pool)
+            .await
+            .expect("Failed to add google_event_id to subscriptions");
+        sqlx::query(
+            "ALTER TABLE subscriptions ADD COLUMN sync_to_calendar INTEGER NOT NULL DEFAULT 1",
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to add sync_to_calendar to subscriptions");
+    }
+
     // ── Migration: Add deposit_account_id to employments ──
 
     let has_deposit_account_id: bool = sqlx::query_scalar(

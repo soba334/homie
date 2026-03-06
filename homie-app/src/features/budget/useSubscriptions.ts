@@ -32,6 +32,7 @@ export function useSubscriptions() {
     billingDay: number;
     nextBillingDate: string;
     note?: string;
+    syncToCalendar?: boolean;
   }) => {
     const created = await api.post<Subscription>('/api/v1/subscriptions', input);
     setSubscriptions((prev) => [...prev, created]);
