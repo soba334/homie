@@ -4,9 +4,9 @@ use std::io::Cursor;
 use std::time::Duration;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 const MAX_FILE_SIZE: usize = 50 * 1024 * 1024; // 50MB
 
@@ -28,14 +28,17 @@ fn validate_magic_bytes(data: &[u8], declared_type: &str) -> bool {
         "application/pdf" => data.starts_with(b"%PDF"),
         "video/mp4" => data.len() >= 8 && (&data[4..8] == b"ftyp" || &data[4..8] == b"moov"),
         "video/quicktime" => data.len() >= 8 && (&data[4..8] == b"ftyp" || &data[4..8] == b"moov"),
-        "video/x-msvideo" => data.starts_with(b"RIFF") && data.len() >= 12 && &data[8..12] == b"AVI ",
+        "video/x-msvideo" => {
+            data.starts_with(b"RIFF") && data.len() >= 12 && &data[8..12] == b"AVI "
+        }
         _ => false,
     }
 }
 
 fn sanitize_filename(name: &str) -> String {
     let name = name.split(['/', '\\', '\0']).last().unwrap_or("unnamed");
-    let sanitized: String = name.chars()
+    let sanitized: String = name
+        .chars()
         .filter(|c| !matches!(c, '\0'..='\x1f' | '<' | '>' | ':' | '"' | '|' | '?' | '*'))
         .collect();
     if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
@@ -55,7 +58,9 @@ fn generate_thumbnail(data: &[u8]) -> Result<Vec<u8>, AppError> {
     let img = image::load_from_memory(data)
         .map_err(|e| AppError::Internal(format!("Image decode error: {e}")))?;
     if img.width() > 20000 || img.height() > 20000 {
-        return Err(AppError::BadRequest("Image dimensions too large".to_string()));
+        return Err(AppError::BadRequest(
+            "Image dimensions too large".to_string(),
+        ));
     }
     let thumb = img.thumbnail(200, 200);
     let mut buf = Vec::new();
@@ -101,9 +106,7 @@ pub async fn upload(
             }
 
             if !ALLOWED_TYPES.contains(&content_type.as_str()) {
-                return Err(AppError::BadRequest(
-                    "Unsupported file type".to_string(),
-                ));
+                return Err(AppError::BadRequest("Unsupported file type".to_string()));
             }
 
             if !validate_magic_bytes(&bytes, &content_type) {
@@ -228,10 +231,7 @@ pub async fn get_url(
         None
     };
 
-    Ok(Json(FileUrlResponse {
-        url,
-        thumbnail_url,
-    }))
+    Ok(Json(FileUrlResponse { url, thumbnail_url }))
 }
 
 pub async fn delete(

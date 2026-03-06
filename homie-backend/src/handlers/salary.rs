@@ -1,9 +1,9 @@
 use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 #[derive(serde::Deserialize)]
 pub struct SalaryQuery {
@@ -155,12 +155,19 @@ fn predict_full_time(emp: &Employment, shifts: &[Shift], year_month: &str) -> Sa
     let total_deductions = social_insurance + income_tax;
     let net = gross - total_deductions;
 
-    let total_work_minutes: i32 = shifts.iter().map(|s| {
-        let start = parse_time_minutes(&s.start_time);
-        let end = parse_time_minutes(&s.end_time);
-        let raw = if end > start { end - start } else { (24 * 60 - start) + end };
-        raw - s.break_minutes
-    }).sum();
+    let total_work_minutes: i32 = shifts
+        .iter()
+        .map(|s| {
+            let start = parse_time_minutes(&s.start_time);
+            let end = parse_time_minutes(&s.end_time);
+            let raw = if end > start {
+                end - start
+            } else {
+                (24 * 60 - start) + end
+            };
+            raw - s.break_minutes
+        })
+        .sum();
 
     SalaryPrediction {
         employment_id: emp.id.clone(),
@@ -346,7 +353,9 @@ pub async fn update_record(
         overtime_pay: input.overtime_pay.unwrap_or(existing.overtime_pay),
         night_pay: input.night_pay.unwrap_or(existing.night_pay),
         holiday_pay: input.holiday_pay.unwrap_or(existing.holiday_pay),
-        transport_allowance: input.transport_allowance.unwrap_or(existing.transport_allowance),
+        transport_allowance: input
+            .transport_allowance
+            .unwrap_or(existing.transport_allowance),
         other_allowances: input.other_allowances.unwrap_or(existing.other_allowances),
         gross_amount: input.gross_amount.unwrap_or(existing.gross_amount),
         social_insurance: input.social_insurance.unwrap_or(existing.social_insurance),

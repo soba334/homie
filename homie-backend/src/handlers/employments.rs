@@ -1,10 +1,10 @@
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::validation::*;
-use crate::AppState;
 
 pub async fn list_employments(
     State(state): State<AppState>,
@@ -99,14 +99,24 @@ pub async fn update_employment(
         hourly_rate: input.hourly_rate.or(existing.hourly_rate),
         night_start_hour: input.night_start_hour.or(existing.night_start_hour),
         night_end_hour: input.night_end_hour.or(existing.night_end_hour),
-        night_rate_multiplier: input.night_rate_multiplier.or(existing.night_rate_multiplier),
-        holiday_rate_multiplier: input.holiday_rate_multiplier.or(existing.holiday_rate_multiplier),
-        overtime_threshold_minutes: input.overtime_threshold_minutes.or(existing.overtime_threshold_minutes),
-        overtime_rate_multiplier: input.overtime_rate_multiplier.or(existing.overtime_rate_multiplier),
+        night_rate_multiplier: input
+            .night_rate_multiplier
+            .or(existing.night_rate_multiplier),
+        holiday_rate_multiplier: input
+            .holiday_rate_multiplier
+            .or(existing.holiday_rate_multiplier),
+        overtime_threshold_minutes: input
+            .overtime_threshold_minutes
+            .or(existing.overtime_threshold_minutes),
+        overtime_rate_multiplier: input
+            .overtime_rate_multiplier
+            .or(existing.overtime_rate_multiplier),
         monthly_salary: input.monthly_salary.or(existing.monthly_salary),
         transport_allowance: input.transport_allowance.or(existing.transport_allowance),
         pay_day: input.pay_day.or(existing.pay_day),
-        social_insurance_rate: input.social_insurance_rate.or(existing.social_insurance_rate),
+        social_insurance_rate: input
+            .social_insurance_rate
+            .or(existing.social_insurance_rate),
         income_tax_rate: input.income_tax_rate.or(existing.income_tax_rate),
         color: input.color.or(existing.color),
         note: input.note.or(existing.note),

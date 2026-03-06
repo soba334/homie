@@ -1,13 +1,13 @@
 use axum::extract::State;
 use axum::response::{IntoResponse, Redirect};
 use axum::{Extension, Json};
-use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::CookieJar;
+use axum_extra::extract::cookie::Cookie;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 // ── Google OAuth helpers ──
 
@@ -20,9 +20,8 @@ fn google_client_secret() -> String {
 }
 
 fn google_calendar_redirect_uri() -> String {
-    std::env::var("GOOGLE_CALENDAR_REDIRECT_URI").unwrap_or_else(|_| {
-        "http://localhost:3001/api/v1/calendar/google/callback".to_string()
-    })
+    std::env::var("GOOGLE_CALENDAR_REDIRECT_URI")
+        .unwrap_or_else(|_| "http://localhost:3001/api/v1/calendar/google/callback".to_string())
 }
 
 fn frontend_url() -> String {
@@ -163,10 +162,7 @@ pub struct CalendarCallbackQuery {
     pub state: String,
 }
 
-pub async fn connect(
-    Extension(auth): Extension<AuthUser>,
-    jar: CookieJar,
-) -> impl IntoResponse {
+pub async fn connect(Extension(auth): Extension<AuthUser>, jar: CookieJar) -> impl IntoResponse {
     let state = format!("gcal_{}", Uuid::new_v4());
 
     let state_cookie = Cookie::build(("gcal_oauth_state", state.clone()))
@@ -244,7 +240,9 @@ pub async fn callback(
         .map_err(|e| AppError::Internal(format!("Token parse error: {e}")))?;
 
     let refresh_token = token_data.refresh_token.ok_or_else(|| {
-        AppError::Internal("No refresh token received. Try revoking app access and reconnecting.".to_string())
+        AppError::Internal(
+            "No refresh token received. Try revoking app access and reconnecting.".to_string(),
+        )
     })?;
 
     let expires_at =
@@ -355,7 +353,9 @@ pub async fn list_calendars(
         .map_err(|e| AppError::Internal(format!("CalendarList API error: {e}")))?;
 
     if !resp.status().is_success() {
-        return Err(AppError::Internal("Failed to fetch calendar list".to_string()));
+        return Err(AppError::Internal(
+            "Failed to fetch calendar list".to_string(),
+        ));
     }
 
     let list: GoogleCalendarListResponse = resp
@@ -434,11 +434,7 @@ fn parse_google_date(dt: &Option<GoogleDateTime>) -> (String, bool) {
                 (date.clone(), true)
             } else if let Some(date_time) = &gdt.date_time {
                 // Extract date part from ISO datetime
-                let date = date_time
-                    .split('T')
-                    .next()
-                    .unwrap_or(date_time)
-                    .to_string();
+                let date = date_time.split('T').next().unwrap_or(date_time).to_string();
                 (date, false)
             } else {
                 (String::new(), false)
@@ -555,10 +551,16 @@ pub async fn sync(
                 if let Some(ref st) = token.sync_token {
                     url.push_str(&format!("&syncToken={}", urlencoding::encode(st)));
                 } else {
-                    url.push_str(&format!("&timeMin={}", urlencoding::encode(&three_months_ago)));
+                    url.push_str(&format!(
+                        "&timeMin={}",
+                        urlencoding::encode(&three_months_ago)
+                    ));
                 }
             } else {
-                url.push_str(&format!("&timeMin={}", urlencoding::encode(&three_months_ago)));
+                url.push_str(&format!(
+                    "&timeMin={}",
+                    urlencoding::encode(&three_months_ago)
+                ));
             }
 
             if let Some(ref pt) = page_token {
@@ -585,7 +587,11 @@ pub async fn sync(
 
             if !resp.status().is_success() {
                 // Skip this calendar on error
-                tracing::warn!("Failed to fetch events from calendar {}: {}", calendar_id, resp.status());
+                tracing::warn!(
+                    "Failed to fetch events from calendar {}: {}",
+                    calendar_id,
+                    resp.status()
+                );
                 break;
             }
 
@@ -719,13 +725,11 @@ pub async fn sync(
         match resp {
             Ok(r) if r.status().is_success() => {
                 if let Ok(created) = r.json::<GoogleCalendarEvent>().await {
-                    sqlx::query(
-                        "UPDATE calendar_events SET google_event_id = ? WHERE id = ?",
-                    )
-                    .bind(&created.id)
-                    .bind(&event.id)
-                    .execute(&state.pool)
-                    .await?;
+                    sqlx::query("UPDATE calendar_events SET google_event_id = ? WHERE id = ?")
+                        .bind(&created.id)
+                        .bind(&event.id)
+                        .execute(&state.pool)
+                        .await?;
                     pushed += 1;
                 }
             }
@@ -759,12 +763,7 @@ fn build_google_event(event: &CalendarEvent) -> GoogleEventInsert {
                 time_zone: None,
             },
             GoogleDateTimeInsert {
-                date: Some(
-                    event
-                        .end_date
-                        .clone()
-                        .unwrap_or_else(|| event.date.clone()),
-                ),
+                date: Some(event.end_date.clone().unwrap_or_else(|| event.date.clone())),
                 date_time: None,
                 time_zone: None,
             },
@@ -838,11 +837,7 @@ pub async fn push_event_to_google(
     }
 }
 
-pub async fn update_event_on_google(
-    pool: &sqlx::SqlitePool,
-    user_id: &str,
-    event: &CalendarEvent,
-) {
+pub async fn update_event_on_google(pool: &sqlx::SqlitePool, user_id: &str, event: &CalendarEvent) {
     let Some(google_event_id) = &event.google_event_id else {
         return;
     };
@@ -875,11 +870,7 @@ pub async fn update_event_on_google(
         .await;
 }
 
-pub async fn delete_event_on_google(
-    pool: &sqlx::SqlitePool,
-    user_id: &str,
-    google_event_id: &str,
-) {
+pub async fn delete_event_on_google(pool: &sqlx::SqlitePool, user_id: &str, google_event_id: &str) {
     let token: Option<GoogleCalendarToken> = sqlx::query_as(
         "SELECT user_id, access_token, refresh_token, expires_at, sync_token, connected_at FROM google_calendar_tokens WHERE user_id = ?",
     )

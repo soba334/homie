@@ -461,10 +461,12 @@ pub async fn init_db(pool: &SqlitePool) {
     .unwrap_or(false);
 
     if !has_account_id {
-        sqlx::query("ALTER TABLE budget_entries ADD COLUMN account_id TEXT REFERENCES accounts(id)")
-            .execute(pool)
-            .await
-            .expect("Failed to add account_id to budget_entries");
+        sqlx::query(
+            "ALTER TABLE budget_entries ADD COLUMN account_id TEXT REFERENCES accounts(id)",
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to add account_id to budget_entries");
     }
 
     // ── calendar_events migration: add google_calendar_id ──
@@ -532,10 +534,12 @@ pub async fn init_db(pool: &SqlitePool) {
     .unwrap_or(false);
 
     if !has_deposit_account_id {
-        sqlx::query("ALTER TABLE employments ADD COLUMN deposit_account_id TEXT REFERENCES accounts(id)")
-            .execute(pool)
-            .await
-            .expect("Failed to add deposit_account_id to employments");
+        sqlx::query(
+            "ALTER TABLE employments ADD COLUMN deposit_account_id TEXT REFERENCES accounts(id)",
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to add deposit_account_id to employments");
     }
 
     // ── File tables ──

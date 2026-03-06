@@ -2,10 +2,10 @@ use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use chrono::Datelike;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::validation::*;
-use crate::AppState;
 
 pub async fn list_goals(
     State(state): State<AppState>,
@@ -169,7 +169,8 @@ fn calc_monthly_required(goal: &SavingsGoal) -> Option<f64> {
         return Some(0.0);
     }
 
-    let months_diff = (target.year() - today.year()) * 12 + (target.month() as i32 - today.month() as i32);
+    let months_diff =
+        (target.year() - today.year()) * 12 + (target.month() as i32 - today.month() as i32);
     if months_diff <= 0 {
         return Some(remaining);
     }

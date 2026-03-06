@@ -6,9 +6,9 @@ use axum_extra::extract::cookie::Cookie;
 use jsonwebtoken::{EncodingKey, Header};
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 #[derive(serde::Deserialize)]
 pub struct CallbackQuery {
@@ -107,12 +107,14 @@ async fn try_auto_join(
 
             if member_count < 2 {
                 let member_id = Uuid::new_v4().to_string();
-                sqlx::query("INSERT INTO members (id, home_id, user_id, role) VALUES (?, ?, ?, 'member')")
-                    .bind(&member_id)
-                    .bind(&invite.home_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
+                sqlx::query(
+                    "INSERT INTO members (id, home_id, user_id, role) VALUES (?, ?, ?, 'member')",
+                )
+                .bind(&member_id)
+                .bind(&invite.home_id)
+                .bind(user_id)
+                .execute(pool)
+                .await?;
 
                 let now = chrono::Utc::now().to_rfc3339();
                 sqlx::query("UPDATE invite_codes SET used_by = ?, used_at = ? WHERE id = ?")
@@ -367,7 +369,10 @@ pub async fn refresh(
         .max_age(time::Duration::seconds(604800))
         .build();
 
-    Ok((jar.add(access_cookie).add(refresh_cookie), axum::http::StatusCode::OK))
+    Ok((
+        jar.add(access_cookie).add(refresh_cookie),
+        axum::http::StatusCode::OK,
+    ))
 }
 
 pub async fn logout(
@@ -408,11 +413,10 @@ pub async fn me(
     .await?;
 
     let home = if let Some(home_id) = &auth.home_id {
-        let home: Home =
-            sqlx::query_as("SELECT id, name, created_at FROM homes WHERE id = ?")
-                .bind(home_id)
-                .fetch_one(&state.pool)
-                .await?;
+        let home: Home = sqlx::query_as("SELECT id, name, created_at FROM homes WHERE id = ?")
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
         let members: Vec<Member> =
             sqlx::query_as("SELECT id, home_id, user_id, role FROM members WHERE home_id = ?")
@@ -465,7 +469,9 @@ pub async fn update_profile(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let trimmed = input.display_name.trim();
     if trimmed.is_empty() || trimmed.len() > 30 {
-        return Err(AppError::BadRequest("ニックネームは1〜30文字で入力してください".into()));
+        return Err(AppError::BadRequest(
+            "ニックネームは1〜30文字で入力してください".into(),
+        ));
     }
 
     sqlx::query("UPDATE users SET display_name = ? WHERE id = ?")

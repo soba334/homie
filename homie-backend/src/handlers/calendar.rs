@@ -3,9 +3,9 @@ use axum::{Extension, Json};
 use chrono::{Datelike, NaiveDate, Weekday};
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -358,10 +358,8 @@ pub async fn list_events(
         .await?
     };
 
-    let result: Vec<ExpandedCalendarEvent> = events
-        .iter()
-        .map(|e| e.to_expanded(false, None))
-        .collect();
+    let result: Vec<ExpandedCalendarEvent> =
+        events.iter().map(|e| e.to_expanded(false, None)).collect();
 
     Ok(Json(result))
 }
@@ -446,14 +444,12 @@ pub async fn update_event(
 
     let home_id = auth.home_id.as_deref().unwrap();
 
-    let existing: CalendarEvent = sqlx::query_as(&format!(
-        "{} WHERE id = ? AND home_id = ?",
-        CALENDAR_SELECT
-    ))
-    .bind(&id)
-    .bind(home_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let existing: CalendarEvent =
+        sqlx::query_as(&format!("{} WHERE id = ? AND home_id = ?", CALENDAR_SELECT))
+            .bind(&id)
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
     check_edit_permission(&existing, &auth.user_id)?;
 
@@ -513,14 +509,12 @@ pub async fn delete_event(
     let home_id = auth.home_id.as_deref().unwrap();
 
     // Get event to check ownership and google_event_id before deletion
-    let event: Option<CalendarEvent> = sqlx::query_as(&format!(
-        "{} WHERE id = ? AND home_id = ?",
-        CALENDAR_SELECT
-    ))
-    .bind(&id)
-    .bind(home_id)
-    .fetch_optional(&state.pool)
-    .await?;
+    let event: Option<CalendarEvent> =
+        sqlx::query_as(&format!("{} WHERE id = ? AND home_id = ?", CALENDAR_SELECT))
+            .bind(&id)
+            .bind(home_id)
+            .fetch_optional(&state.pool)
+            .await?;
 
     if let Some(ref ev) = event {
         check_edit_permission(ev, &auth.user_id)?;
@@ -536,12 +530,8 @@ pub async fn delete_event(
     if let Some(event) = event
         && let Some(gid) = &event.google_event_id
     {
-        crate::handlers::google_calendar::delete_event_on_google(
-            &state.pool,
-            &auth.user_id,
-            gid,
-        )
-        .await;
+        crate::handlers::google_calendar::delete_event_on_google(&state.pool, &auth.user_id, gid)
+            .await;
     }
 
     Ok(())
@@ -554,14 +544,12 @@ pub async fn toggle_task(
 ) -> Result<Json<CalendarEvent>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap();
 
-    let existing: CalendarEvent = sqlx::query_as(&format!(
-        "{} WHERE id = ? AND home_id = ?",
-        CALENDAR_SELECT
-    ))
-    .bind(&id)
-    .bind(home_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let existing: CalendarEvent =
+        sqlx::query_as(&format!("{} WHERE id = ? AND home_id = ?", CALENDAR_SELECT))
+            .bind(&id)
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
     check_edit_permission(&existing, &auth.user_id)?;
 
@@ -591,14 +579,12 @@ pub async fn create_exception(
     let home_id = auth.home_id.as_deref().unwrap();
 
     // Verify event exists, belongs to home, and is recurring
-    let event: CalendarEvent = sqlx::query_as(&format!(
-        "{} WHERE id = ? AND home_id = ?",
-        CALENDAR_SELECT
-    ))
-    .bind(&event_id)
-    .bind(home_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let event: CalendarEvent =
+        sqlx::query_as(&format!("{} WHERE id = ? AND home_id = ?", CALENDAR_SELECT))
+            .bind(&event_id)
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
     if event.recurrence_rule.is_none() {
         return Err(AppError::BadRequest(
@@ -648,22 +634,18 @@ pub async fn delete_exception(
     let home_id = auth.home_id.as_deref().unwrap();
 
     // Verify event belongs to home
-    let _event: CalendarEvent = sqlx::query_as(&format!(
-        "{} WHERE id = ? AND home_id = ?",
-        CALENDAR_SELECT
-    ))
-    .bind(&event_id)
-    .bind(home_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let _event: CalendarEvent =
+        sqlx::query_as(&format!("{} WHERE id = ? AND home_id = ?", CALENDAR_SELECT))
+            .bind(&event_id)
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
-    sqlx::query(
-        "DELETE FROM calendar_event_exceptions WHERE event_id = ? AND original_date = ?",
-    )
-    .bind(&event_id)
-    .bind(&original_date)
-    .execute(&state.pool)
-    .await?;
+    sqlx::query("DELETE FROM calendar_event_exceptions WHERE event_id = ? AND original_date = ?")
+        .bind(&event_id)
+        .bind(&original_date)
+        .execute(&state.pool)
+        .await?;
 
     Ok(())
 }

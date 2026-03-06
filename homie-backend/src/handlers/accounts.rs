@@ -1,10 +1,10 @@
 use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::validation::*;
-use crate::AppState;
 
 #[derive(serde::Deserialize)]
 pub struct TransactionQuery {
@@ -42,7 +42,11 @@ pub async fn create_account(
 ) -> Result<Json<AccountWithBalance>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap().to_string();
     validate_name(&input.name, "name")?;
-    validate_enum(&input.account_type, &["bank", "credit_card", "cash", "e_money"], "type")?;
+    validate_enum(
+        &input.account_type,
+        &["bank", "credit_card", "cash", "e_money"],
+        "type",
+    )?;
     if let Some(balance) = input.initial_balance {
         validate_amount(balance.abs(), "initialBalance")?;
     }
@@ -184,7 +188,11 @@ pub async fn create_transaction(
 ) -> Result<Json<AccountTransaction>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap().to_string();
     validate_amount(input.amount, "amount")?;
-    validate_enum(&input.transaction_type, &["income", "expense", "transfer"], "type")?;
+    validate_enum(
+        &input.transaction_type,
+        &["income", "expense", "transfer"],
+        "type",
+    )?;
     let tx = AccountTransaction::new(account_id, home_id, input);
 
     sqlx::query(
