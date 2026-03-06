@@ -7,13 +7,19 @@ export function useEmployments() {
   const [loading, setLoading] = useState(true);
 
   const fetchEmployments = useCallback(async () => {
-    const data = await api.get<Employment[]>('/api/v1/employments');
-    setEmployments(data);
+    setLoading(true);
+    try {
+      const data = await api.get<Employment[]>('/api/v1/employments');
+      setEmployments(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchEmployments().catch(() => {}).finally(() => setLoading(false));
+    fetchEmployments();
   }, [fetchEmployments]);
 
   const addEmployment = useCallback(async (input: Record<string, unknown>) => {
@@ -41,17 +47,23 @@ export function useShifts(yearMonth?: string, userId?: string) {
   const [loading, setLoading] = useState(true);
 
   const fetchShifts = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (yearMonth) params.set('year_month', yearMonth);
-    if (userId) params.set('user_id', userId);
-    const qs = params.toString();
-    const data = await api.get<Shift[]>(`/api/v1/shifts${qs ? `?${qs}` : ''}`);
-    setShifts(data);
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (yearMonth) params.set('year_month', yearMonth);
+      if (userId) params.set('user_id', userId);
+      const qs = params.toString();
+      const data = await api.get<Shift[]>(`/api/v1/shifts${qs ? `?${qs}` : ''}`);
+      setShifts(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, [yearMonth, userId]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchShifts().catch(() => {}).finally(() => setLoading(false));
+    fetchShifts();
   }, [fetchShifts]);
 
   const addShift = useCallback(async (input: {
@@ -87,14 +99,20 @@ export function useSalary(yearMonth?: string) {
   const [loading, setLoading] = useState(true);
 
   const fetchRecords = useCallback(async () => {
-    const params = yearMonth ? `?year_month=${yearMonth}` : '';
-    const data = await api.get<SalaryRecord[]>(`/api/v1/salary/records${params}`);
-    setRecords(data);
+    setLoading(true);
+    try {
+      const params = yearMonth ? `?year_month=${yearMonth}` : '';
+      const data = await api.get<SalaryRecord[]>(`/api/v1/salary/records${params}`);
+      setRecords(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, [yearMonth]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchRecords().catch(() => {}).finally(() => setLoading(false));
+    fetchRecords();
   }, [fetchRecords]);
 
   const predict = useCallback(async (employmentId: string, ym: string) => {

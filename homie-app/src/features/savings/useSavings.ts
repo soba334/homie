@@ -7,13 +7,19 @@ export function useSavings() {
   const [loading, setLoading] = useState(true);
 
   const fetchGoals = useCallback(async () => {
-    const data = await api.get<SavingsGoalWithProgress[]>('/api/v1/savings');
-    setGoals(data);
+    setLoading(true);
+    try {
+      const data = await api.get<SavingsGoalWithProgress[]>('/api/v1/savings');
+      setGoals(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchGoals().catch(() => {}).finally(() => setLoading(false));
+    fetchGoals();
   }, [fetchGoals]);
 
   const addGoal = useCallback(async (input: {

@@ -44,6 +44,7 @@ export function useAuthProvider() {
   const [loading, setLoading] = useState(true);
 
   const fetchMe = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await api.get<MeResponse>('/api/v1/auth/me');
       setUser(data);
@@ -60,12 +61,13 @@ export function useAuthProvider() {
       } else {
         setUser(null);
       }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchMe().finally(() => setLoading(false));
+    fetchMe();
   }, [fetchMe]);
 
   const login = useCallback(() => {
