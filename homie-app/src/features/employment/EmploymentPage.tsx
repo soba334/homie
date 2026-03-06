@@ -7,7 +7,7 @@ import {
   ChevronRight,
   Calculator,
 } from 'lucide-react';
-import { Card, Button, Modal, Spinner, Tabs, TabContent } from '@/components/ui';
+import { Card, Button, Modal, Spinner, Tabs, TabContent, useToast } from '@/components/ui';
 import { useEmployments, useShifts, useSalary } from './useEmployment';
 import { useAccounts } from '@/features/accounts/useAccounts';
 import { useAuth } from '@/features/auth/useAuth';
@@ -64,6 +64,7 @@ export function EmploymentPage() {
 function EmploymentsTab() {
   const { employments, loading, addEmployment, updateEmployment, deleteEmployment } =
     useEmployments();
+  const { toast } = useToast();
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const members = user?.home?.members ?? [];
@@ -141,8 +142,10 @@ function EmploymentsTab() {
       }
       resetForm();
       setShowForm(false);
+      toast(editingId ? '更新しました' : '登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました');
+      toast(editingId ? '更新に失敗しました' : '登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -207,9 +210,14 @@ function EmploymentsTab() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  deleteEmployment(emp.id);
+                  try {
+                    await deleteEmployment(emp.id);
+                    toast('削除しました');
+                  } catch {
+                    toast('削除に失敗しました', 'error');
+                  }
                 }}
               >
                 <Trash2 size={14} />
@@ -365,6 +373,7 @@ function ShiftsTab() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
   const { shifts, loading, addShift, deleteShift } = useShifts(yearMonth);
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
 
   // Form state
@@ -412,8 +421,10 @@ function ShiftsTab() {
         isHoliday,
       });
       setShowForm(false);
+      toast('登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '追加に失敗しました');
+      toast('登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -472,7 +483,14 @@ function ShiftsTab() {
                   {empNameMap[shift.employmentId] || '不明'}
                 </p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => deleteShift(shift.id)}>
+              <Button size="sm" variant="ghost" onClick={async () => {
+                try {
+                  await deleteShift(shift.id);
+                  toast('削除しました');
+                } catch {
+                  toast('削除に失敗しました', 'error');
+                }
+              }}>
                 <Trash2 size={14} />
               </Button>
             </div>
@@ -569,6 +587,7 @@ function SalaryTab() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
   const { records, loading, predict, addRecord, deleteRecord } = useSalary(yearMonth);
+  const { toast } = useToast();
   const [showPrediction, setShowPrediction] = useState(false);
   const [predictionEmploymentId, setPredictionEmploymentId] = useState('');
   const [prediction, setPrediction] = useState<{
@@ -643,8 +662,10 @@ function SalaryTab() {
       setGrossAmount('');
       setNetAmount('');
       setRecNote('');
+      toast('登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '追加に失敗しました');
+      toast('登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -712,7 +733,14 @@ function SalaryTab() {
                     <p className="text-xs text-on-surface-variant mt-1">{rec.note}</p>
                   )}
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => deleteRecord(rec.id)}>
+                <Button size="sm" variant="ghost" onClick={async () => {
+                  try {
+                    await deleteRecord(rec.id);
+                    toast('削除しました');
+                  } catch {
+                    toast('削除に失敗しました', 'error');
+                  }
+                }}>
                   <Trash2 size={14} />
                 </Button>
               </div>

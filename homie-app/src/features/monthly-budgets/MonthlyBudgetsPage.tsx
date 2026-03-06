@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Target, Plus, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Card, Button, Modal, Spinner } from '@/components/ui';
+import { Card, Button, Modal, Spinner, useToast } from '@/components/ui';
 import { useMonthlyBudgets } from './useMonthlyBudgets';
 
 const CATEGORIES = ['食費', '日用品', '光熱費', '家賃', '交通費', '医療費', '娯楽', 'その他'];
@@ -12,6 +12,7 @@ export function MonthlyBudgetsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
   const { budgets, loading, upsertBudget, deleteBudget } = useMonthlyBudgets(yearMonth);
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
@@ -63,8 +64,10 @@ export function MonthlyBudgetsPage() {
       await upsertBudget({ category, amount: num, yearMonth });
       resetForm();
       setShowForm(false);
+      toast(editingCategory ? '更新しました' : '登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました');
+      toast(editingCategory ? '更新に失敗しました' : '登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -136,9 +139,14 @@ export function MonthlyBudgetsPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        deleteBudget(item.category);
+                        try {
+                          await deleteBudget(item.category);
+                          toast('削除しました');
+                        } catch {
+                          toast('削除に失敗しました', 'error');
+                        }
                       }}
                     >
                       <Trash2 size={14} />

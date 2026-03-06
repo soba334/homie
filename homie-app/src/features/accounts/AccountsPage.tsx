@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Landmark, Plus, Trash2 } from 'lucide-react';
-import { Card, Button, Modal, Spinner } from '@/components/ui';
+import { Card, Button, Modal, Spinner, useToast } from '@/components/ui';
 import { useAccounts, useAccountTransactions } from './useAccounts';
 import { useAuth } from '@/features/auth/useAuth';
 import { format } from 'date-fns';
@@ -31,6 +31,7 @@ const COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'
 
 export function AccountsPage() {
   const { accounts, loading, totalBalance, addAccount, deleteAccount } = useAccounts();
+  const { toast } = useToast();
   const { user } = useAuth();
   const members = user?.home?.members ?? [];
   const [showAddAccount, setShowAddAccount] = useState(false);
@@ -85,8 +86,10 @@ export function AccountsPage() {
       });
       resetAccountForm();
       setShowAddAccount(false);
+      toast('登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '追加に失敗しました');
+      toast('登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -152,9 +155,14 @@ export function AccountsPage() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      deleteAccount(account.id);
+                      try {
+                        await deleteAccount(account.id);
+                        toast('削除しました');
+                      } catch {
+                        toast('削除に失敗しました', 'error');
+                      }
                     }}
                   >
                     <Trash2 size={14} />
@@ -376,6 +384,7 @@ function AddTransactionModal({
   onClose: () => void;
 }) {
   const { addTransaction } = useAccountTransactions(accountId);
+  const { toast } = useToast();
   const [amount, setAmount] = useState('');
   const [txType, setTxType] = useState<string>('expense');
   const [category, setCategory] = useState(CATEGORIES[0]);
@@ -399,8 +408,10 @@ function AddTransactionModal({
         date,
       });
       onClose();
+      toast('登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '追加に失敗しました');
+      toast('登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }

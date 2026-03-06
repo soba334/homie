@@ -3,7 +3,7 @@ import { CalendarDays, Plus, ChevronLeft, ChevronRight, CheckSquare, Square, Ref
 import { motion } from 'motion/react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Card, Button, Modal, Spinner } from '@/components/ui';
+import { Card, Button, Modal, Spinner, useToast } from '@/components/ui';
 import { useCalendar } from './useCalendar';
 import { useGoogleCalendar } from './google';
 import { useAuth } from '@/features/auth/useAuth';
@@ -25,6 +25,7 @@ function eventColor(ev: { type: string; color?: string }) {
 export function CalendarPage() {
   const { user } = useAuth();
   const { events, loading, fetchEvents, toggleTask, deleteEvent } = useCalendar();
+  const { toast } = useToast();
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // shared/garbage: 誰でも編集可, それ以外: 作成者のみ
@@ -237,7 +238,14 @@ export function CalendarPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     {!ev.garbageScheduleId && !ev.isRecurrenceInstance && canEdit(ev) && (
-                      <button className="text-danger text-xs cursor-pointer" onClick={() => deleteEvent(ev.id)}>削除</button>
+                      <button className="text-danger text-xs cursor-pointer" onClick={async () => {
+                        try {
+                          await deleteEvent(ev.id);
+                          toast('削除しました');
+                        } catch {
+                          toast('削除に失敗しました', 'error');
+                        }
+                      }}>削除</button>
                     )}
                   </div>
                 </div>
@@ -271,7 +279,7 @@ export function CalendarPage() {
       <Modal open={showForm} onClose={() => setShowForm(false)} title="予定を追加">
         <CalendarEventForm
           initialDate={selectedDate || new Date()}
-          onSubmit={() => setShowForm(false)}
+          onSubmit={() => { setShowForm(false); toast('登録しました'); }}
         />
       </Modal>
     </div>

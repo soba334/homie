@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Plus, Pencil } from 'lucide-react';
-import { Card, Button, SearchInput, Modal, FileUpload, Spinner } from '@/components/ui';
+import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
 import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
@@ -10,6 +10,7 @@ const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
 export function GarbagePage() {
   const { categories, schedules, loading, searchItems, deleteCategory, deleteSchedule, deleteAll, todaySchedules, addCategory, updateCategory, addSchedule, updateSchedule, refetch } = useGarbage();
+  const { toast } = useToast();
   const [query, setQuery] = useState('');
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -89,7 +90,14 @@ export function GarbagePage() {
                   <Button size="sm" variant="ghost" onClick={() => setEditingCategory(cat)}>
                     <Pencil size={14} />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => deleteCategory(cat.id)}>
+                  <Button size="sm" variant="ghost" onClick={async () => {
+                    try {
+                      await deleteCategory(cat.id);
+                      toast('削除しました');
+                    } catch {
+                      toast('削除に失敗しました', 'error');
+                    }
+                  }}>
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -126,7 +134,14 @@ export function GarbagePage() {
                         </button>
                         <button
                           className="text-danger cursor-pointer p-0.5"
-                          onClick={() => deleteSchedule(s.id)}
+                          onClick={async () => {
+                            try {
+                              await deleteSchedule(s.id);
+                              toast('削除しました');
+                            } catch {
+                              toast('削除に失敗しました', 'error');
+                            }
+                          }}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -162,9 +177,14 @@ export function GarbagePage() {
           <Button
             variant="ghost"
             className="w-full text-danger"
-            onClick={() => {
+            onClick={async () => {
               if (window.confirm('全てのゴミ分類・スケジュールを削除しますか？この操作は取り消せません。')) {
-                deleteAll();
+                try {
+                  await deleteAll();
+                  toast('削除しました');
+                } catch {
+                  toast('削除に失敗しました', 'error');
+                }
               }
             }}
           >
@@ -179,7 +199,7 @@ export function GarbagePage() {
         <GarbageCategoryForm
           addCategory={addCategory}
           updateCategory={updateCategory}
-          onSubmit={() => { setShowCategoryForm(false); refetch(); }}
+          onSubmit={() => { setShowCategoryForm(false); refetch(); toast('登録しました'); }}
         />
       </Modal>
 
@@ -190,7 +210,7 @@ export function GarbagePage() {
             addCategory={addCategory}
             updateCategory={updateCategory}
             initial={editingCategory}
-            onSubmit={() => { setEditingCategory(null); refetch(); }}
+            onSubmit={() => { setEditingCategory(null); refetch(); toast('更新しました'); }}
           />
         )}
       </Modal>
@@ -201,7 +221,7 @@ export function GarbagePage() {
           categories={categories}
           addSchedule={addSchedule}
           updateSchedule={updateSchedule}
-          onSubmit={() => { setShowScheduleForm(false); refetch(); }}
+          onSubmit={() => { setShowScheduleForm(false); refetch(); toast('登録しました'); }}
         />
       </Modal>
 
@@ -213,7 +233,7 @@ export function GarbagePage() {
             addSchedule={addSchedule}
             updateSchedule={updateSchedule}
             initial={editingSchedule}
-            onSubmit={() => { setEditingSchedule(null); refetch(); }}
+            onSubmit={() => { setEditingSchedule(null); refetch(); toast('更新しました'); }}
           />
         )}
       </Modal>

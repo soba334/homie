@@ -5,7 +5,7 @@ import {
   AlertTriangle, Landmark, PiggyBank, Target, RefreshCw, Pause, Play,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Card, Button, Modal, FileUpload, Spinner, Tabs, TabContent } from '@/components/ui';
+import { Card, Button, Modal, FileUpload, Spinner, Tabs, TabContent, useToast } from '@/components/ui';
 import { useBudget } from './useBudget';
 import { useMonthlyBudgets } from '@/features/monthly-budgets/useMonthlyBudgets';
 import { useAccounts } from '@/features/accounts/useAccounts';
@@ -38,6 +38,7 @@ export function BudgetPage() {
   const accounts = useAccounts();
   const savings = useSavings();
   const subs = useSubscriptions();
+  const { toast } = useToast();
 
   const members = user?.home?.members ?? [];
   const memberName = (id: string) => {
@@ -82,8 +83,10 @@ export function BudgetPage() {
       await monthlyBudgets.upsertBudget({ category: budgetCategory, amount: num, yearMonth });
       setShowBudgetForm(false);
       setBudgetAmount('');
+      toast('登録しました');
     } catch (err) {
       setBudgetError(err instanceof Error ? err.message : '保存に失敗しました');
+      toast('登録に失敗しました', 'error');
     } finally {
       setBudgetSubmitting(false);
     }
@@ -281,7 +284,14 @@ export function BudgetPage() {
                     <Button size="sm" variant="ghost" onClick={() => setEditingEntry(entry)}>
                       <Pencil size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => budget.deleteEntry(entry.id)}>
+                    <Button size="sm" variant="ghost" onClick={async () => {
+                      try {
+                        await budget.deleteEntry(entry.id);
+                        toast('削除しました');
+                      } catch {
+                        toast('削除に失敗しました', 'error');
+                      }
+                    }}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
@@ -345,11 +355,25 @@ export function BudgetPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => subs.updateSubscription(sub.id, { isActive: !sub.isActive })}
+                      onClick={async () => {
+                        try {
+                          await subs.updateSubscription(sub.id, { isActive: !sub.isActive });
+                          toast('更新しました');
+                        } catch {
+                          toast('更新に失敗しました', 'error');
+                        }
+                      }}
                     >
                       {sub.isActive ? <Pause size={14} /> : <Play size={14} />}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => subs.deleteSubscription(sub.id)}>
+                    <Button size="sm" variant="ghost" onClick={async () => {
+                      try {
+                        await subs.deleteSubscription(sub.id);
+                        toast('削除しました');
+                      } catch {
+                        toast('削除に失敗しました', 'error');
+                      }
+                    }}>
                       <Trash2 size={14} />
                     </Button>
                   </div>
@@ -450,6 +474,7 @@ export function BudgetPage() {
           onSubmit={() => {
             setShowEntryForm(false);
             monthlyBudgets.refetch();
+            toast('登録しました');
           }}
         />
       </Modal>
@@ -465,6 +490,7 @@ export function BudgetPage() {
             onSubmit={() => {
               setEditingEntry(null);
               monthlyBudgets.refetch();
+              toast('更新しました');
             }}
           />
         )}
@@ -516,7 +542,7 @@ export function BudgetPage() {
         <SubscriptionForm
           addSubscription={subs.addSubscription}
           updateSubscription={subs.updateSubscription}
-          onSubmit={() => { setShowSubForm(false); subs.refetch(); }}
+          onSubmit={() => { setShowSubForm(false); subs.refetch(); toast('登録しました'); }}
         />
       </Modal>
 
@@ -527,7 +553,7 @@ export function BudgetPage() {
             addSubscription={subs.addSubscription}
             updateSubscription={subs.updateSubscription}
             initial={editingSub}
-            onSubmit={() => { setEditingSub(null); subs.refetch(); }}
+            onSubmit={() => { setEditingSub(null); subs.refetch(); toast('更新しました'); }}
           />
         )}
       </Modal>
