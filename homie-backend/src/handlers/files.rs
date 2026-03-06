@@ -36,7 +36,10 @@ fn validate_magic_bytes(data: &[u8], declared_type: &str) -> bool {
 }
 
 fn sanitize_filename(name: &str) -> String {
-    let name = name.split(['/', '\\', '\0']).next_back().unwrap_or("unnamed");
+    let name = name
+        .split(['/', '\\', '\0'])
+        .next_back()
+        .unwrap_or("unnamed");
     let sanitized: String = name
         .chars()
         .filter(|c| !matches!(c, '\0'..='\x1f' | '<' | '>' | ':' | '"' | '|' | '?' | '*'))
