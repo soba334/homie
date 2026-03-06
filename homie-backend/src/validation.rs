@@ -46,13 +46,6 @@ pub fn validate_hour(hour: i32, field: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn validate_rate(rate: f64, field: &str) -> Result<(), AppError> {
-    if rate < 0.0 || rate > 100.0 {
-        return Err(AppError::BadRequest(format!("{field} must be between 0 and 100")));
-    }
-    Ok(())
-}
-
 pub fn validate_enum(value: &str, allowed: &[&str], field: &str) -> Result<(), AppError> {
     if !allowed.contains(&value) {
         return Err(AppError::BadRequest(format!("Invalid {field}: {value}")));
