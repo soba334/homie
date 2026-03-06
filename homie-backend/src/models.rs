@@ -1334,3 +1334,31 @@ pub struct UpdateNotificationPreferences {
     pub subscription_enabled: Option<bool>,
     pub subscription_days_before: Option<i32>,
 }
+
+// ── Document AI ──
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentExtractResponse {
+    pub chunks_extracted: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DocumentAskRequest {
+    pub query: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentAskResult {
+    pub answer: String,
+    pub sources: Vec<DocumentSource>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSource {
+    pub document_id: String,
+    pub title: String,
+    pub snippet: String,
+}

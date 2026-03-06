@@ -36,9 +36,10 @@ export function useDocuments() {
     fileType: string;
     tags: string[];
     note?: string;
-  }) => {
+  }): Promise<Document> => {
     const created = await api.post<Document>('/api/v1/documents', doc);
     setDocuments((prev) => [created, ...prev]);
+    return created;
   }, []);
 
   const updateDocument = useCallback(async (id: string, updates: Partial<Document>) => {

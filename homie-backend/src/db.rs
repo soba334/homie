@@ -611,4 +611,59 @@ pub async fn init_db(pool: &SqlitePool) {
     .execute(pool)
     .await
     .expect("Failed to create notification_preferences table");
+
+    // ── Document AI text extraction tables ──
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS document_texts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            home_id TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL,
+            content TEXT NOT NULL
+        )",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create document_texts table");
+
+    sqlx::query(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS document_texts_fts USING fts5(
+            content,
+            content='document_texts',
+            content_rowid='id'
+        )",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create document_texts_fts table");
+
+    // Triggers to keep FTS in sync
+    sqlx::query(
+        "CREATE TRIGGER IF NOT EXISTS document_texts_ai AFTER INSERT ON document_texts BEGIN
+            INSERT INTO document_texts_fts(rowid, content) VALUES (new.id, new.content);
+        END",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create document_texts_ai trigger");
+
+    sqlx::query(
+        "CREATE TRIGGER IF NOT EXISTS document_texts_ad AFTER DELETE ON document_texts BEGIN
+            INSERT INTO document_texts_fts(document_texts_fts, rowid, content) VALUES('delete', old.id, old.content);
+        END",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create document_texts_ad trigger");
+
+    sqlx::query(
+        "CREATE TRIGGER IF NOT EXISTS document_texts_au AFTER UPDATE ON document_texts BEGIN
+            INSERT INTO document_texts_fts(document_texts_fts, rowid, content) VALUES('delete', old.id, old.content);
+            INSERT INTO document_texts_fts(rowid, content) VALUES (new.id, new.content);
+        END",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create document_texts_au trigger");
 }
