@@ -90,13 +90,6 @@ export function BudgetPage() {
   }
 
   const loading = budget.loading || monthlyBudgets.loading || accounts.loading || savings.loading || subs.loading;
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner />
-      </div>
-    );
-  }
 
   const sortedEntries = [...budget.entries].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -159,7 +152,12 @@ export function BudgetPage() {
 
       <Tabs tabs={TAB_ITEMS} activeKey={tab} onChange={(key) => setTab(key as Tab)} layoutId="budget-tab" />
 
-      <TabContent activeKey={tab}>
+      <TabContent activeKey={loading ? '__loading__' : tab}>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Spinner />
+        </div>
+      ) : (<>
       {tab === 'overview' && (
         <div className="space-y-4">
           {/* Budget Progress */}
@@ -440,6 +438,7 @@ export function BudgetPage() {
           )}
         </div>
       )}
+      </>)}
       </TabContent>
 
       {/* Add Entry Modal */}
