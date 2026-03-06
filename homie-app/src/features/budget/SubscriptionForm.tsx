@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { CalendarSync } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/features/auth/useAuth';
 import { useAccounts } from '@/features/accounts/useAccounts';
+import { useGoogleCalendar } from '@/features/calendar/google';
 import type { Subscription } from '@/types';
 
 const ACCOUNT_TYPE_LABEL: Record<string, string> = {
@@ -31,6 +33,7 @@ interface Props {
     billingDay: number;
     nextBillingDate: string;
     note?: string;
+    syncToCalendar?: boolean;
   }) => Promise<unknown>;
   updateSubscription: (id: string, updates: Partial<Subscription>) => Promise<unknown>;
   onSubmit: () => void;
@@ -40,6 +43,7 @@ interface Props {
 export function SubscriptionForm({ addSubscription, updateSubscription, onSubmit, initial }: Props) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
+  const { isConnected: googleConnected } = useGoogleCalendar();
   const members = user?.home?.members ?? [];
 
   const isEdit = !!initial;
@@ -55,6 +59,7 @@ export function SubscriptionForm({ addSubscription, updateSubscription, onSubmit
     initial?.nextBillingDate || format(new Date(), 'yyyy-MM-dd')
   );
   const [note, setNote] = useState(initial?.note || '');
+  const [syncToCalendar, setSyncToCalendar] = useState(initial?.syncToCalendar ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +81,7 @@ export function SubscriptionForm({ addSubscription, updateSubscription, onSubmit
           billingDay: parseInt(billingDay, 10),
           nextBillingDate,
           note: note.trim() || undefined,
+          syncToCalendar,
         });
       } else {
         await addSubscription({
@@ -88,6 +94,7 @@ export function SubscriptionForm({ addSubscription, updateSubscription, onSubmit
           billingDay: parseInt(billingDay, 10),
           nextBillingDate,
           note: note.trim() || undefined,
+          syncToCalendar,
         });
       }
       onSubmit();
@@ -236,6 +243,27 @@ export function SubscriptionForm({ addSubscription, updateSubscription, onSubmit
           placeholder="例: ファミリープラン"
         />
       </div>
+      {googleConnected && (
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium flex items-center gap-2">
+            <CalendarSync size={16} />
+            Googleカレンダーに同期
+          </label>
+          <button
+            type="button"
+            className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${
+              syncToCalendar ? 'bg-primary' : 'bg-outline'
+            }`}
+            onClick={() => setSyncToCalendar(!syncToCalendar)}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                syncToCalendar ? 'translate-x-5' : ''
+              }`}
+            />
+          </button>
+        </div>
+      )}
       {error && <p className="text-xs text-danger">{error}</p>}
       <Button type="submit" className="w-full" disabled={submitting}>
         {submitting ? `${isEdit ? '更新' : '登録'}中...` : `${isEdit ? '更新する' : '登録する'}`}

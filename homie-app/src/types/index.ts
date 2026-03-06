@@ -182,6 +182,8 @@ export interface Subscription {
   nextBillingDate: string;
   isActive: boolean;
   note?: string;
+  googleEventId?: string;
+  syncToCalendar: boolean;
   createdAt: string;
 }
 
