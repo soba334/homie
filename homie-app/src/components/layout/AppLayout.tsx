@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   Home,
   Wallet,
@@ -48,42 +49,52 @@ export function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Overlay */}
-      {moreOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-40"
-          onClick={() => setMoreOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {moreOpen && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              className="fixed inset-0 bg-black/30 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMoreOpen(false)}
+            />
 
-      {/* Slide-up more panel */}
-      <div
-        className={`fixed left-0 right-0 bottom-[calc(3.5rem+1px)] z-50 transform transition-transform duration-200 ease-out ${
-          moreOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        <div className="max-w-4xl mx-auto bg-surface border border-outline rounded-t-2xl shadow-lg px-4 py-4">
-          <div className="grid grid-cols-2 gap-3">
-            {MORE_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => setMoreOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-on-surface hover:bg-surface-container'
-                  }`
-                }
-              >
-                <Icon size={20} />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </div>
-        </div>
-      </div>
+            {/* Slide-up more panel */}
+            <motion.div
+              className="fixed left-0 right-0 bottom-[calc(3.5rem+1px)] z-50"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <div className="max-w-4xl mx-auto bg-surface border border-outline rounded-t-2xl shadow-lg px-4 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {MORE_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={() => setMoreOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-on-surface hover:bg-surface-container'
+                        }`
+                      }
+                    >
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-outline z-50">
         <div className="max-w-4xl mx-auto flex">

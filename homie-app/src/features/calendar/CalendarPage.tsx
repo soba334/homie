@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, Plus, ChevronLeft, ChevronRight, CheckSquare, Square, Loader2, RefreshCw } from 'lucide-react';
+import { CalendarDays, Plus, ChevronLeft, ChevronRight, CheckSquare, Square, RefreshCw } from 'lucide-react';
+import { motion } from 'motion/react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Card, Button, Modal } from '@/components/ui';
+import { Card, Button, Modal, Spinner } from '@/components/ui';
 import { useCalendar } from './useCalendar';
 import { useGoogleCalendar } from './google';
 import { useAuth } from '@/features/auth/useAuth';
@@ -111,7 +112,13 @@ export function CalendarPage() {
         <div className="flex gap-2">
           {google.isConnected && (
             <Button size="sm" variant="secondary" onClick={handleSync} disabled={google.loading}>
-              <RefreshCw size={16} className={`inline mr-1 ${google.loading ? 'animate-spin' : ''}`} />
+              <motion.span
+                className="inline mr-1"
+                animate={google.loading ? { rotate: 360 } : { rotate: 0 }}
+                transition={google.loading ? { repeat: Infinity, duration: 1, ease: 'linear' } : { duration: 0 }}
+              >
+                <RefreshCw size={16} />
+              </motion.span>
               同期
             </Button>
           )}
@@ -142,7 +149,7 @@ export function CalendarPage() {
             <h2 className="text-lg font-bold">
               {format(currentMonth, 'yyyy年M月', { locale: ja })}
             </h2>
-            {loading && <Loader2 size={16} className="animate-spin text-on-surface-variant" />}
+            {loading && <Spinner size={16} />}
           </div>
           <button className="p-2 hover:bg-surface-container rounded-lg cursor-pointer" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
             <ChevronRight size={20} />

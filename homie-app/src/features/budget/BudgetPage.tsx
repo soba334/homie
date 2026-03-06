@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Wallet, Plus, Trash2, Loader2, ChevronLeft, ChevronRight, Pencil,
+  Wallet, Plus, Trash2, ChevronLeft, ChevronRight, Pencil,
   AlertTriangle, Landmark, PiggyBank, Target, RefreshCw, Pause, Play,
 } from 'lucide-react';
-import { Card, Button, Modal, FileUpload } from '@/components/ui';
+import { motion } from 'motion/react';
+import { Card, Button, Modal, FileUpload, Spinner, Tabs, TabContent } from '@/components/ui';
 import { useBudget } from './useBudget';
 import { useMonthlyBudgets } from '@/features/monthly-budgets/useMonthlyBudgets';
 import { useAccounts } from '@/features/accounts/useAccounts';
@@ -92,14 +93,14 @@ export function BudgetPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
 
   const sortedEntries = [...budget.entries].sort((a, b) => b.date.localeCompare(a.date));
 
-  const TABS: { key: Tab; label: string }[] = [
+  const TAB_ITEMS = [
     { key: 'overview', label: '概要' },
     { key: 'expenses', label: '支出' },
     { key: 'subscriptions', label: '定期' },
@@ -156,21 +157,9 @@ export function BudgetPage() {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-outline">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            className={`flex-1 py-2 text-sm font-medium cursor-pointer transition-colors border-b-2
-              ${tab === t.key ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TAB_ITEMS} activeKey={tab} onChange={(key) => setTab(key as Tab)} layoutId="budget-tab" />
 
-      {/* Tab Content */}
+      <TabContent activeKey={tab}>
       {tab === 'overview' && (
         <div className="space-y-4">
           {/* Budget Progress */}
@@ -203,9 +192,11 @@ export function BudgetPage() {
                       </span>
                     </div>
                     <div className="w-full bg-surface-container rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${item.overBudget ? 'bg-red-500' : 'bg-primary'}`}
-                        style={{ width: `${rate}%` }}
+                      <motion.div
+                        className={`h-1.5 rounded-full ${item.overBudget ? 'bg-red-500' : 'bg-primary'}`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${rate}%` }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
                       />
                     </div>
                   </Card>
@@ -429,7 +420,12 @@ export function BudgetPage() {
                       <span className="text-sm font-medium">{Math.round(goal.progressRate)}%</span>
                     </div>
                     <div className="w-full bg-surface-container rounded-full h-2">
-                      <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${rate}%` }} />
+                      <motion.div
+                        className="h-2 rounded-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${rate}%` }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                      />
                     </div>
                     <div className="flex justify-between text-xs text-on-surface-variant">
                       <span>{goal.currentAmount.toLocaleString()}円 / {goal.targetAmount.toLocaleString()}円</span>
@@ -444,6 +440,7 @@ export function BudgetPage() {
           )}
         </div>
       )}
+      </TabContent>
 
       {/* Add Entry Modal */}
       <Modal open={showEntryForm} onClose={() => setShowEntryForm(false)} title="支出を追加">

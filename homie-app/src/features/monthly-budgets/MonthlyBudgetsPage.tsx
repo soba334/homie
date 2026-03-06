@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Target, Plus, Trash2, Loader2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { Card, Button, Modal } from '@/components/ui';
+import { Target, Plus, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Card, Button, Modal, Spinner } from '@/components/ui';
 import { useMonthlyBudgets } from './useMonthlyBudgets';
 
 const CATEGORIES = ['食費', '日用品', '光熱費', '家賃', '交通費', '医療費', '娯楽', 'その他'];
@@ -72,7 +73,7 @@ export function MonthlyBudgetsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
@@ -144,9 +145,11 @@ export function MonthlyBudgetsPage() {
                     </Button>
                   </div>
                   <div className="w-full bg-surface-container rounded-full h-2.5">
-                    <div
-                      className={`h-2.5 rounded-full transition-all ${item.overBudget ? 'bg-red-500' : 'bg-primary'}`}
-                      style={{ width: `${rate}%` }}
+                    <motion.div
+                      className={`h-2.5 rounded-full ${item.overBudget ? 'bg-red-500' : 'bg-primary'}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${rate}%` }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
                     />
                   </div>
                   <div className="flex justify-between text-sm text-on-surface-variant">

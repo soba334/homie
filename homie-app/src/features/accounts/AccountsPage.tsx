@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Landmark, Plus, Trash2, Loader2 } from 'lucide-react';
-import { Card, Button, Modal } from '@/components/ui';
+import { Landmark, Plus, Trash2 } from 'lucide-react';
+import { Card, Button, Modal, Spinner } from '@/components/ui';
 import { useAccounts, useAccountTransactions } from './useAccounts';
 import { useAuth } from '@/features/auth/useAuth';
 import { format } from 'date-fns';
@@ -95,7 +95,7 @@ export function AccountsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
@@ -329,7 +329,7 @@ function AccountTransactionsModal({
         </div>
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-on-surface-variant" />
+            <Spinner size={20} />
           </div>
         ) : transactions.length === 0 ? (
           <p className="text-center text-on-surface-variant py-4">取引履歴がありません</p>

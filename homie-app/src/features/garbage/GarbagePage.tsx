@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Trash2, Plus, Loader2, Pencil } from 'lucide-react';
-import { Card, Button, SearchInput, Modal, FileUpload } from '@/components/ui';
+import { Trash2, Plus, Pencil } from 'lucide-react';
+import { Card, Button, SearchInput, Modal, FileUpload, Spinner } from '@/components/ui';
 import { useGarbage } from './useGarbage';
 import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
@@ -26,7 +26,7 @@ export function GarbagePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }

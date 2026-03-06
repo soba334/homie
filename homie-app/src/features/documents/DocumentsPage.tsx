@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { FileText, Plus, Trash2, ExternalLink, Loader2 } from 'lucide-react';
-import { Card, Button, SearchInput, Modal } from '@/components/ui';
+import { FileText, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { Card, Button, SearchInput, Modal, Spinner } from '@/components/ui';
 import { useDocuments } from './useDocuments';
 import { DocumentForm } from './DocumentForm';
 import { format } from 'date-fns';
@@ -22,7 +22,7 @@ export function DocumentsPage() {
   if (loading && documents.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }

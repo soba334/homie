@@ -42,7 +42,7 @@ export function DashboardPage() {
 
       {todayGarbage.length > 0 && (
         <Link to="/garbage">
-          <Card className="border-primary bg-primary/5 hover:shadow-md transition-shadow">
+          <Card className="border-primary bg-primary/5 hover:shadow-md">
             <div className="flex items-center gap-3">
               <Trash2 size={20} className="text-primary" />
               <div>
@@ -62,7 +62,7 @@ export function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Link to="/budget">
-          <Card className="hover:shadow-md transition-shadow">
+          <Card className="hover:shadow-md">
             <div className="flex items-center gap-3">
               <Wallet size={20} className="text-accent" />
               <div>
@@ -74,7 +74,7 @@ export function DashboardPage() {
         </Link>
 
         <Link to="/calendar">
-          <Card className="hover:shadow-md transition-shadow">
+          <Card className="hover:shadow-md">
             <div className="flex items-center gap-3">
               <CalendarDays size={20} className="text-primary" />
               <div>
@@ -86,7 +86,7 @@ export function DashboardPage() {
         </Link>
 
         <Link to="/accounts">
-          <Card className="hover:shadow-md transition-shadow">
+          <Card className="hover:shadow-md">
             <div className="flex items-center gap-3">
               <Landmark size={20} className="text-accent" />
               <div>
