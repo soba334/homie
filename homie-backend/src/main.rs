@@ -151,6 +151,8 @@ async fn main() {
             put(handlers::garbage::update_schedule).delete(handlers::garbage::delete_schedule),
         )
         .route("/api/v1/garbage/all", delete(handlers::garbage::delete_all))
+        .route("/api/v1/garbage/ask", post(handlers::garbage::ask))
+        .route("/api/v1/garbage/extract", post(handlers::garbage::extract))
         // Budget
         .route(
             "/api/v1/budget/entries",

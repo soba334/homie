@@ -39,6 +39,7 @@ export function useGarbage() {
   }) => {
     const created = await api.post<GarbageCategory>('/api/v1/garbage/categories', category);
     setCategories((prev) => [...prev, created]);
+    return created;
   }, []);
 
   const updateCategory = useCallback(async (id: string, updates: Partial<GarbageCategory>) => {

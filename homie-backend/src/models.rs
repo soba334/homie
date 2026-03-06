@@ -1267,6 +1267,54 @@ pub struct UnsubscribePush {
     pub endpoint: String,
 }
 
+// ── Garbage Sort AI ──
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarbageSortRequest {
+    pub query: Option<String>,
+    pub file_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GarbageSortResult {
+    pub category: Option<String>,
+    pub explanation: String,
+    pub tips: Option<String>,
+}
+
+// ── Garbage Extract AI ──
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarbageExtractRequest {
+    pub file_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarbageExtractResult {
+    pub categories: Vec<GarbageExtractCategory>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarbageExtractCategory {
+    pub name: String,
+    pub color: String,
+    pub description: String,
+    pub items: Vec<String>,
+    pub schedule: Option<GarbageExtractSchedule>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarbageExtractSchedule {
+    pub day_of_week: Vec<i32>,
+    pub week_of_month: Vec<i32>,
+    pub note: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationPreferences {

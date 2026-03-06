@@ -1,9 +1,45 @@
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
 
 use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
+
+// ── Ollama chat API structs (local to this module) ──
+
+#[derive(Debug, serde::Deserialize)]
+struct OllamaChatResponse {
+    message: Option<OllamaChatMessage>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct OllamaChatMessage {
+    content: String,
+}
+
+/// Strip markdown fences (```json ... ```) if present.
+fn extract_json_from_response(raw: &str) -> &str {
+    let trimmed = raw.trim();
+
+    // Handle ```json ... ``` or ``` ... ```
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        // Skip the optional language tag on the first line
+        let rest = if let Some(pos) = rest.find('\n') {
+            &rest[pos + 1..]
+        } else {
+            rest
+        };
+        // Strip trailing ```
+        if let Some(json_body) = rest.strip_suffix("```") {
+            return json_body.trim();
+        }
+        return rest.trim();
+    }
+
+    trimmed
+}
 
 // ── Categories ──
 
@@ -337,4 +373,315 @@ pub async fn delete_schedule(
         .execute(&state.pool)
         .await?;
     Ok(())
+}
+
+// ── AI Extract (from garbage guide images/PDFs) ──
+
+pub async fn extract(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Json(req): Json<GarbageExtractRequest>,
+) -> Result<Json<GarbageExtractResult>, AppError> {
+    let home_id = auth
+        .home_id
+        .as_deref()
+        .ok_or_else(|| AppError::Forbidden("No home membership".to_string()))?;
+
+    // 1. Look up file, verify home_id, validate it's image or PDF
+    let file: FileRecord = sqlx::query_as(
+        "SELECT id, home_id, original_name, content_type, size, s3_key, thumbnail_key, uploaded_by, uploaded_at FROM files WHERE id = ? AND home_id = ?",
+    )
+    .bind(&req.file_id)
+    .bind(home_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| match e {
+        sqlx::Error::RowNotFound => AppError::NotFound,
+        other => AppError::Internal(other.to_string()),
+    })?;
+
+    if !file.content_type.starts_with("image/") && file.content_type != "application/pdf" {
+        return Err(AppError::BadRequest(
+            "File must be an image or PDF".to_string(),
+        ));
+    }
+
+    // 2. Download from S3, base64 encode
+    let file_bytes = state.storage.download(&file.s3_key).await?;
+    let file_base64 = BASE64.encode(&file_bytes);
+
+    // 3. Build Ollama request
+    let ollama_url =
+        std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
+    let ollama_model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen3.5:2b".to_string());
+
+    let system_prompt = "あなたはゴミ分別表の読み取りアシスタントです。アップロードされた画像またはPDFはゴミの分別方法が書かれた資料です。以下のJSON形式で全てのゴミカテゴリと分別ルールを抽出してください。\n\n```json\n{\"categories\": [{\"name\": \"カテゴリ名（例: 燃えるゴミ）\", \"color\": \"#カラーコード（6桁16進数、適切な色を割り当て）\", \"description\": \"説明（収集時の注意点など）\", \"items\": [\"品目1\", \"品目2\", \"品目3\"], \"schedule\": {\"dayOfWeek\": [0], \"weekOfMonth\": [1], \"note\": \"収集時間等の備考\"}}]}\n```\n\n全てのカテゴリを漏れなく抽出してください。色は以下から選んでください: #EF4444(赤), #F59E0B(黄), #10B981(緑), #3B82F6(青), #8B5CF6(紫), #EC4899(ピンク), #6B7280(グレー), #F97316(オレンジ)\nJSONのみを返してください。";
+
+    let user_message = if file.content_type.starts_with("image/") {
+        serde_json::json!({
+            "role": "user",
+            "content": "この分別表の内容を全て抽出してください。",
+            "images": [file_base64]
+        })
+    } else {
+        serde_json::json!({
+            "role": "user",
+            "content": format!("この分別表の内容を全て抽出してください。\n\n[添付ファイル: {}]", file.original_name)
+        })
+    };
+
+    let ollama_body = serde_json::json!({
+        "model": ollama_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            user_message
+        ],
+        "stream": false,
+        "options": {
+            "temperature": 0.1
+        }
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{ollama_url}/api/chat"))
+        .json(&ollama_body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Ollama request failed: {e}")))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_else(|_| "unknown".to_string());
+        return Err(AppError::Internal(format!(
+            "Ollama returned {status}: {body}"
+        )));
+    }
+
+    let ollama_resp: OllamaChatResponse = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to parse Ollama response: {e}")))?;
+
+    // 4. Parse the response into a structured result
+    let content = ollama_resp.message.map(|m| m.content).unwrap_or_default();
+    let json_str = extract_json_from_response(&content);
+
+    let result: GarbageExtractResult = serde_json::from_str(json_str).map_err(|e| {
+        AppError::Internal(format!(
+            "Failed to parse garbage extract data from model response: {e}. Raw content: {content}"
+        ))
+    })?;
+
+    Ok(Json(result))
+}
+
+// ── AI Sort ──
+
+pub async fn ask(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthUser>,
+    Json(req): Json<GarbageSortRequest>,
+) -> Result<Json<GarbageSortResult>, AppError> {
+    let home_id = auth
+        .home_id
+        .as_deref()
+        .ok_or_else(|| AppError::Forbidden("No home membership".to_string()))?;
+
+    // 1. Validate at least query or fileId is provided
+    if req.query.is_none() && req.file_id.is_none() {
+        return Err(AppError::BadRequest(
+            "At least one of query or fileId must be provided".to_string(),
+        ));
+    }
+
+    // 2. Load garbage categories with items
+    let mut categories: Vec<GarbageCategory> = sqlx::query_as(
+        "SELECT id, home_id, name, color, description FROM garbage_categories WHERE home_id = ?",
+    )
+    .bind(home_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    for cat in &mut categories {
+        let items: Vec<(String,)> =
+            sqlx::query_as("SELECT item FROM garbage_category_items WHERE category_id = ?")
+                .bind(&cat.id)
+                .fetch_all(&state.pool)
+                .await?;
+        cat.items = items.into_iter().map(|(item,)| item).collect();
+    }
+
+    // Load schedules
+    let mut schedules: Vec<GarbageSchedule> = sqlx::query_as(
+        "SELECT id, home_id, category_id, location, note FROM garbage_schedules WHERE home_id = ?",
+    )
+    .bind(home_id)
+    .fetch_all(&state.pool)
+    .await?;
+
+    for s in &mut schedules {
+        let days: Vec<(i32,)> =
+            sqlx::query_as("SELECT day_of_week FROM garbage_schedule_days WHERE schedule_id = ?")
+                .bind(&s.id)
+                .fetch_all(&state.pool)
+                .await?;
+        s.day_of_week = days.into_iter().map(|(d,)| d).collect();
+
+        let weeks: Vec<(i32,)> = sqlx::query_as(
+            "SELECT week_of_month FROM garbage_schedule_weeks WHERE schedule_id = ?",
+        )
+        .bind(&s.id)
+        .fetch_all(&state.pool)
+        .await?;
+        s.week_of_month = if weeks.is_empty() {
+            None
+        } else {
+            Some(weeks.into_iter().map(|(w,)| w).collect())
+        };
+    }
+
+    // 3. Build context string
+    let day_names = ['日', '月', '火', '水', '木', '金', '土'];
+    let mut context = String::from("あなたの家のゴミ分別ルール:\n");
+
+    for cat in &categories {
+        // Find schedules for this category
+        let cat_schedules: Vec<&GarbageSchedule> = schedules
+            .iter()
+            .filter(|s| s.category_id == cat.id)
+            .collect();
+
+        let schedule_str = if cat_schedules.is_empty() {
+            String::new()
+        } else {
+            let parts: Vec<String> = cat_schedules
+                .iter()
+                .map(|s| {
+                    let days: Vec<String> = s
+                        .day_of_week
+                        .iter()
+                        .filter_map(|&d| day_names.get(d as usize).map(|c| c.to_string()))
+                        .collect();
+                    let days_str = days.join("・");
+
+                    if let Some(ref weeks) = s.week_of_month {
+                        let weeks_str: Vec<String> =
+                            weeks.iter().map(|w| format!("第{w}")).collect();
+                        format!("{days_str}, {}週", weeks_str.join("・"))
+                    } else {
+                        days_str
+                    }
+                })
+                .collect();
+            format!("(収集日: {})", parts.join(", "))
+        };
+
+        context.push_str(&format!("\n【{}】{}\n", cat.name, schedule_str));
+        if !cat.items.is_empty() {
+            context.push_str(&format!("対象品目: {}\n", cat.items.join(", ")));
+        }
+    }
+
+    // 4. If fileId provided, download image from S3, base64 encode
+    let image_base64 = if let Some(ref file_id) = req.file_id {
+        let file: FileRecord = sqlx::query_as(
+            "SELECT id, home_id, original_name, content_type, size, s3_key, thumbnail_key, uploaded_by, uploaded_at FROM files WHERE id = ? AND home_id = ?",
+        )
+        .bind(file_id)
+        .bind(home_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => AppError::NotFound,
+            other => AppError::Internal(other.to_string()),
+        })?;
+
+        if !file.content_type.starts_with("image/") {
+            return Err(AppError::BadRequest("File is not an image".to_string()));
+        }
+
+        let image_bytes = state.storage.download(&file.s3_key).await?;
+        Some(BASE64.encode(&image_bytes))
+    } else {
+        None
+    };
+
+    // 5. Build Ollama request
+    let ollama_url =
+        std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
+    let ollama_model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen3.5:2b".to_string());
+
+    let system_prompt = format!(
+        "あなたはゴミ分別アシスタントです。ユーザーの家のゴミ分別ルールに基づいて、正確に分別方法を答えてください。\n\n{context}\n\n以下のJSON形式で回答してください:\n{{\"category\": \"該当カテゴリ名\", \"explanation\": \"理由の説明\", \"tips\": \"出す時の注意点(あれば)\"}}\nJSONのみを返してください。該当するカテゴリがない場合はcategoryをnullにしてください。"
+    );
+
+    let user_query = req
+        .query
+        .as_deref()
+        .unwrap_or("この画像の物は何ゴミですか？");
+
+    let user_message = if let Some(ref b64) = image_base64 {
+        serde_json::json!({
+            "role": "user",
+            "content": user_query,
+            "images": [b64]
+        })
+    } else {
+        serde_json::json!({
+            "role": "user",
+            "content": user_query
+        })
+    };
+
+    let ollama_body = serde_json::json!({
+        "model": ollama_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            user_message
+        ],
+        "stream": false,
+        "options": {
+            "temperature": 0.1
+        }
+    });
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{ollama_url}/api/chat"))
+        .json(&ollama_body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Ollama request failed: {e}")))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_else(|_| "unknown".to_string());
+        return Err(AppError::Internal(format!(
+            "Ollama returned {status}: {body}"
+        )));
+    }
+
+    let ollama_resp: OllamaChatResponse = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to parse Ollama response: {e}")))?;
+
+    // 6. Parse response and return
+    let content = ollama_resp.message.map(|m| m.content).unwrap_or_default();
+    let json_str = extract_json_from_response(&content);
+
+    let result: GarbageSortResult = serde_json::from_str(json_str).map_err(|e| {
+        AppError::Internal(format!(
+            "Failed to parse garbage sort data from model response: {e}. Raw content: {content}"
+        ))
+    })?;
+
+    Ok(Json(result))
 }
