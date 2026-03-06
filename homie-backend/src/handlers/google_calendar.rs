@@ -87,6 +87,10 @@ struct GoogleEventInsert {
     description: Option<String>,
     start: GoogleDateTimeInsert,
     end: GoogleDateTimeInsert,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    recurrence: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transparency: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -792,6 +796,8 @@ fn build_google_event(event: &CalendarEvent) -> GoogleEventInsert {
         description: event.description.clone(),
         start,
         end,
+        recurrence: None,
+        transparency: None,
     }
 }
 
@@ -868,6 +874,142 @@ pub async fn update_event_on_google(pool: &sqlx::SqlitePool, user_id: &str, even
         .json(&google_event)
         .send()
         .await;
+}
+
+pub async fn push_subscription_to_google(
+    pool: &sqlx::SqlitePool,
+    user_id: &str,
+    sub: &crate::models::Subscription,
+) -> Result<Option<String>, AppError> {
+    let token: Option<GoogleCalendarToken> = sqlx::query_as(
+        "SELECT user_id, access_token, refresh_token, expires_at, sync_token, connected_at FROM google_calendar_tokens WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(token) = token else {
+        return Ok(None);
+    };
+
+    let access_token = refresh_google_token(pool, &token).await?;
+    let client = reqwest::Client::new();
+
+    let rrule = build_subscription_rrule(&sub.billing_cycle, sub.billing_day);
+    let google_event = GoogleEventInsert {
+        summary: format!("💳 {} ({}円)", sub.name, sub.amount as i64),
+        description: Some(format!(
+            "定期支払い: {}\n金額: {}円\nカテゴリ: {}",
+            sub.name, sub.amount as i64, sub.category
+        )),
+        start: GoogleDateTimeInsert {
+            date: Some(sub.next_billing_date.clone()),
+            date_time: None,
+            time_zone: None,
+        },
+        end: GoogleDateTimeInsert {
+            date: Some(sub.next_billing_date.clone()),
+            date_time: None,
+            time_zone: None,
+        },
+        recurrence: Some(vec![rrule]),
+        transparency: Some("transparent".to_string()),
+    };
+
+    let resp = client
+        .post("https://www.googleapis.com/calendar/v3/calendars/primary/events")
+        .bearer_auth(&access_token)
+        .json(&google_event)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Google push failed: {e}")))?;
+
+    if resp.status().is_success() {
+        let created: GoogleCalendarEvent = resp
+            .json()
+            .await
+            .map_err(|e| AppError::Internal(format!("Parse error: {e}")))?;
+        Ok(Some(created.id))
+    } else {
+        tracing::warn!("Google push failed for subscription: {}", resp.status());
+        Ok(None)
+    }
+}
+
+pub async fn update_subscription_on_google(
+    pool: &sqlx::SqlitePool,
+    user_id: &str,
+    sub: &crate::models::Subscription,
+) {
+    let Some(google_event_id) = &sub.google_event_id else {
+        return;
+    };
+
+    let token: Option<GoogleCalendarToken> = sqlx::query_as(
+        "SELECT user_id, access_token, refresh_token, expires_at, sync_token, connected_at FROM google_calendar_tokens WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    let Some(token) = token else { return };
+    let Ok(access_token) = refresh_google_token(pool, &token).await else {
+        return;
+    };
+
+    let rrule = build_subscription_rrule(&sub.billing_cycle, sub.billing_day);
+    let google_event = GoogleEventInsert {
+        summary: format!("💳 {} ({}円)", sub.name, sub.amount as i64),
+        description: Some(format!(
+            "定期支払い: {}\n金額: {}円\nカテゴリ: {}",
+            sub.name, sub.amount as i64, sub.category
+        )),
+        start: GoogleDateTimeInsert {
+            date: Some(sub.next_billing_date.clone()),
+            date_time: None,
+            time_zone: None,
+        },
+        end: GoogleDateTimeInsert {
+            date: Some(sub.next_billing_date.clone()),
+            date_time: None,
+            time_zone: None,
+        },
+        recurrence: Some(vec![rrule]),
+        transparency: Some("transparent".to_string()),
+    };
+
+    let url = format!(
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events/{}",
+        urlencoding::encode(google_event_id)
+    );
+
+    let _ = reqwest::Client::new()
+        .put(&url)
+        .bearer_auth(&access_token)
+        .json(&google_event)
+        .send()
+        .await;
+}
+
+fn build_subscription_rrule(billing_cycle: &str, billing_day: i32) -> String {
+    match billing_cycle {
+        "weekly" => {
+            let day = match billing_day {
+                0 => "SU",
+                1 => "MO",
+                2 => "TU",
+                3 => "WE",
+                4 => "TH",
+                5 => "FR",
+                6 => "SA",
+                _ => "MO",
+            };
+            format!("RRULE:FREQ=WEEKLY;BYDAY={day}")
+        }
+        "yearly" => "RRULE:FREQ=YEARLY".to_string(),
+        _ => format!("RRULE:FREQ=MONTHLY;BYMONTHDAY={billing_day}"),
+    }
 }
 
 pub async fn delete_event_on_google(pool: &sqlx::SqlitePool, user_id: &str, google_event_id: &str) {
