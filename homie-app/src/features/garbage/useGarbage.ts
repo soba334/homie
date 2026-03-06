@@ -87,10 +87,26 @@ export function useGarbage() {
     );
   }, [categories]);
 
-  const todaySchedules = useMemo(() => {
-    const today = new Date().getDay();
-    return schedules.filter((s) => s.dayOfWeek.includes(today));
-  }, [schedules]);
+  const getSchedulesForDate = useCallback(
+    (date: Date) => {
+      const dow = date.getDay();
+      const weekOfMonth = Math.ceil(date.getDate() / 7);
+      return schedules.filter(
+        (s) =>
+          s.dayOfWeek.includes(dow) &&
+          (!s.weekOfMonth || s.weekOfMonth.length === 0 || s.weekOfMonth.includes(weekOfMonth)),
+      );
+    },
+    [schedules],
+  );
+
+  const todaySchedules = useMemo(() => getSchedulesForDate(new Date()), [getSchedulesForDate]);
+
+  const tomorrowSchedules = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return getSchedulesForDate(tomorrow);
+  }, [getSchedulesForDate]);
 
   const refetch = useCallback(async () => {
     await Promise.all([fetchCategories(), fetchSchedules()]);
@@ -109,6 +125,7 @@ export function useGarbage() {
     deleteAll,
     searchItems,
     todaySchedules,
+    tomorrowSchedules,
     refetch,
   };
 }
