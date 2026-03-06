@@ -10,29 +10,33 @@ interface TabsProps {
   tabs: Tab[];
   activeKey: string;
   onChange: (key: string) => void;
-  layoutId?: string;
 }
 
-export function Tabs({ tabs, activeKey, onChange, layoutId = 'tab-indicator' }: TabsProps) {
+export function Tabs({ tabs, activeKey, onChange }: TabsProps) {
+  const activeIndex = tabs.findIndex((t) => t.key === activeKey);
+  const tabCount = tabs.length;
+
   return (
-    <div className="flex border-b border-outline">
+    <div className="relative flex border-b border-outline">
       {tabs.map((tab) => (
         <button
           key={tab.key}
-          className={`relative flex-1 py-2 text-sm font-medium cursor-pointer transition-colors
+          className={`flex-1 py-2 text-sm font-medium cursor-pointer transition-colors
             ${activeKey === tab.key ? 'text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
           onClick={() => onChange(tab.key)}
         >
           {tab.label}
-          {activeKey === tab.key && (
-            <motion.div
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-              layoutId={layoutId}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-            />
-          )}
         </button>
       ))}
+      <motion.div
+        className="absolute bottom-0 h-0.5 bg-primary"
+        initial={false}
+        animate={{
+          left: `${(activeIndex / tabCount) * 100}%`,
+          width: `${100 / tabCount}%`,
+        }}
+        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+      />
     </div>
   );
 }

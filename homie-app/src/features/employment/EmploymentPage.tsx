@@ -48,7 +48,7 @@ export function EmploymentPage() {
         就業・給料
       </h1>
 
-      <Tabs tabs={TABS} activeKey={activeTab} onChange={(key) => setActiveTab(key as Tab)} layoutId="employment-tab" />
+      <Tabs tabs={TABS} activeKey={activeTab} onChange={(key) => setActiveTab(key as Tab)} />
 
       <TabContent activeKey={activeTab}>
         {activeTab === 'employments' && <EmploymentsTab />}

@@ -150,7 +150,7 @@ export function BudgetPage() {
         </Card>
       </div>
 
-      <Tabs tabs={TAB_ITEMS} activeKey={tab} onChange={(key) => setTab(key as Tab)} layoutId="budget-tab" />
+      <Tabs tabs={TAB_ITEMS} activeKey={tab} onChange={(key) => setTab(key as Tab)} />
 
       <TabContent activeKey={loading ? '__loading__' : tab}>
       {loading ? (
