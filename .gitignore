@@ -7,3 +7,4 @@
 
 # Specs (dev workflow)
 specs/
+.claude/
