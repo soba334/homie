@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { Settings, LogOut, UserPlus, Pencil, Check, X, Users, User } from 'lucide-react';
+import { Settings, LogOut, UserPlus, Pencil, Check, X, Users, User, Bell } from 'lucide-react';
 import { Card, Button, Modal } from '@/components/ui';
 import { useAuth } from '@/features/auth/useAuth';
 import { InvitePartner } from '@/features/auth/InvitePartner';
 import { api } from '@/utils/api';
+import { useNotificationSettings } from '@/features/settings/useNotificationSettings';
 
 export function SettingsPage() {
   const { user, logout, refetchMe } = useAuth();
+  const {
+    supported: pushSupported,
+    permission: pushPermission,
+    subscribed: pushSubscribed,
+    preferences: pushPreferences,
+    loading: pushLoading,
+    enableNotifications,
+    disableNotifications,
+    updatePreferences,
+  } = useNotificationSettings();
 
   const [editingName, setEditingName] = useState(false);
   const [nickname, setNickname] = useState(user?.displayName ?? user?.name ?? '');
@@ -164,6 +175,125 @@ export function SettingsPage() {
 
       {/* Invite (only if no partner) */}
       {!partner && <InvitePartner />}
+
+      {/* Notification Settings */}
+      <section className="space-y-2">
+        <h2 className="font-bold text-sm text-on-surface-variant flex items-center gap-1.5">
+          <Bell size={14} />
+          通知
+        </h2>
+        <Card>
+          {!pushSupported ? (
+            <p className="text-sm text-on-surface-variant">
+              お使いのブラウザはプッシュ通知に対応していません
+            </p>
+          ) : pushPermission === 'denied' ? (
+            <p className="text-sm text-on-surface-variant">
+              ブラウザの通知設定でブロックされています
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {/* Push ON/OFF */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">プッシュ通知</label>
+                <button
+                  type="button"
+                  className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${
+                    pushSubscribed ? 'bg-primary' : 'bg-outline'
+                  }`}
+                  disabled={pushLoading}
+                  onClick={() =>
+                    pushSubscribed ? disableNotifications() : enableNotifications()
+                  }
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                      pushSubscribed ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {pushSubscribed && (
+                <>
+                  {/* Garbage notification ON/OFF */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">ゴミ出し通知</label>
+                    <button
+                      type="button"
+                      className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${
+                        pushPreferences?.garbageEnabled ? 'bg-primary' : 'bg-outline'
+                      }`}
+                      onClick={() =>
+                        updatePreferences({
+                          garbageEnabled: !pushPreferences?.garbageEnabled,
+                        })
+                      }
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                          pushPreferences?.garbageEnabled ? 'translate-x-5' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Garbage timing */}
+                  {pushPreferences?.garbageEnabled && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-on-surface-variant">通知タイミング</label>
+                      <div className="flex gap-2">
+                        {([
+                          { value: 'eve', label: '前日のみ' },
+                          { value: 'day', label: '当日のみ' },
+                          { value: 'both', label: '両方' },
+                        ] as const).map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={`px-3 py-1.5 rounded-full text-sm cursor-pointer transition-colors ${
+                              pushPreferences.garbageTiming === opt.value
+                                ? 'bg-primary text-white'
+                                : 'bg-surface-container hover:bg-outline'
+                            }`}
+                            onClick={() =>
+                              updatePreferences({ garbageTiming: opt.value })
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Subscription notification ON/OFF */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">支払い通知</label>
+                    <button
+                      type="button"
+                      className={`relative w-11 h-6 rounded-full cursor-pointer transition-colors ${
+                        pushPreferences?.subscriptionEnabled ? 'bg-primary' : 'bg-outline'
+                      }`}
+                      onClick={() =>
+                        updatePreferences({
+                          subscriptionEnabled: !pushPreferences?.subscriptionEnabled,
+                        })
+                      }
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                          pushPreferences?.subscriptionEnabled ? 'translate-x-5' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </Card>
+      </section>
 
       {/* Logout */}
       <section>

@@ -1222,3 +1222,43 @@ impl SalaryRecord {
         }
     }
 }
+
+// ── Push Notifications ──
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePushSubscription {
+    pub endpoint: String,
+    pub keys: PushSubscriptionKeys,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PushSubscriptionKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UnsubscribePush {
+    pub endpoint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationPreferences {
+    pub user_id: String,
+    pub garbage_enabled: bool,
+    pub garbage_timing: String,
+    pub subscription_enabled: bool,
+    pub subscription_days_before: i32,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateNotificationPreferences {
+    pub garbage_enabled: Option<bool>,
+    pub garbage_timing: Option<String>,
+    pub subscription_enabled: Option<bool>,
+    pub subscription_days_before: Option<i32>,
+}

@@ -25,3 +25,4 @@ aws-sdk-s3 = "1"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-credential-types = "1"
 image = "0.25"
+web-push = "0.10"

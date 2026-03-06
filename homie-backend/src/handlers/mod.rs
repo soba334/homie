@@ -9,6 +9,7 @@ pub mod garbage;
 pub mod google_calendar;
 pub mod homes;
 pub mod monthly_budgets;
+pub mod push;
 pub mod salary;
 pub mod savings;
 pub mod shifts;

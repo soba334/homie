@@ -3,6 +3,7 @@ mod errors;
 mod handlers;
 mod middleware;
 mod models;
+mod scheduler;
 mod storage;
 mod validation;
 
@@ -105,6 +106,16 @@ async fn main() {
             "/api/v1/calendar/google/calendars",
             get(handlers::google_calendar::list_calendars)
                 .put(handlers::google_calendar::update_calendar_selections),
+        )
+        // Push Notifications
+        .route("/api/v1/push/subscribe", post(handlers::push::subscribe))
+        .route(
+            "/api/v1/push/unsubscribe",
+            post(handlers::push::unsubscribe),
+        )
+        .route(
+            "/api/v1/push/preferences",
+            get(handlers::push::get_preferences).put(handlers::push::update_preferences),
         )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
@@ -297,6 +308,11 @@ async fn main() {
     let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
     let addr = format!("0.0.0.0:{port}");
     info!("Server running on http://{addr}");
+
+    let scheduler_pool = pool.clone();
+    tokio::spawn(async move {
+        scheduler::run(scheduler_pool).await;
+    });
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
