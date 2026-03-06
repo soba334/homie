@@ -3,12 +3,11 @@ import {
   Briefcase,
   Plus,
   Trash2,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   Calculator,
 } from 'lucide-react';
-import { Card, Button, Modal } from '@/components/ui';
+import { Card, Button, Modal, Spinner, Tabs, TabContent } from '@/components/ui';
 import { useEmployments, useShifts, useSalary } from './useEmployment';
 import { useAccounts } from '@/features/accounts/useAccounts';
 import { useAuth } from '@/features/auth/useAuth';
@@ -49,27 +48,13 @@ export function EmploymentPage() {
         就業・給料
       </h1>
 
-      {/* Tab Navigation */}
-      <div className="flex border-b border-outline">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            className={`flex-1 py-2.5 text-sm font-medium cursor-pointer transition-colors
-              ${
-                activeTab === tab.key
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TABS} activeKey={activeTab} onChange={(key) => setActiveTab(key as Tab)} />
 
-      {activeTab === 'employments' && <EmploymentsTab />}
-      {activeTab === 'shifts' && <ShiftsTab />}
-      {activeTab === 'salary' && <SalaryTab />}
+      <TabContent activeKey={activeTab}>
+        {activeTab === 'employments' && <EmploymentsTab />}
+        {activeTab === 'shifts' && <ShiftsTab />}
+        {activeTab === 'salary' && <SalaryTab />}
+      </TabContent>
     </div>
   );
 }
@@ -166,7 +151,7 @@ function EmploymentsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
@@ -437,7 +422,7 @@ function ShiftsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
@@ -668,7 +653,7 @@ function SalaryTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }

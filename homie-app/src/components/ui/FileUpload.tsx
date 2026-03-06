@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Upload } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface FileUploadProps {
   accept: string;
@@ -19,9 +20,14 @@ export function FileUpload({ accept, onFileSelect, multiple = false, children }:
   }
 
   return (
-    <div
-      className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer
-        ${isDragging ? 'border-primary bg-primary/5' : 'border-outline hover:border-primary-light'}`}
+    <motion.div
+      animate={{
+        borderColor: isDragging ? 'var(--color-primary)' : 'var(--color-outline)',
+        backgroundColor: isDragging ? 'rgb(99 102 241 / 0.05)' : 'transparent',
+      }}
+      whileHover={{ borderColor: 'var(--color-primary-light)' }}
+      transition={{ duration: 0.15 }}
+      className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer"
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
@@ -41,6 +47,6 @@ export function FileUpload({ accept, onFileSelect, multiple = false, children }:
           <p>ファイルをドラッグ&ドロップ、またはクリックして選択</p>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

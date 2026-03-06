@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { GarbagePage } from '@/features/garbage';
@@ -19,7 +20,12 @@ export default function App() {
   if (auth.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-primary" />
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+        >
+          <Loader2 size={32} className="text-primary" />
+        </motion.div>
       </div>
     );
   }

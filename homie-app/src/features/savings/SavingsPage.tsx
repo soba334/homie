@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { PiggyBank, Plus, Loader2 } from 'lucide-react';
-import { Card, Button, Modal } from '@/components/ui';
+import { PiggyBank, Plus } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Card, Button, Modal, Spinner } from '@/components/ui';
 import { useSavings } from './useSavings';
 import { format } from 'date-fns';
 
@@ -83,7 +84,7 @@ export function SavingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin text-on-surface-variant" />
+        <Spinner />
       </div>
     );
   }
@@ -127,9 +128,11 @@ export function SavingsPage() {
                     )}
                   </div>
                   <div className="w-full bg-surface-container rounded-full h-2.5">
-                    <div
-                      className="h-2.5 rounded-full bg-primary transition-all"
-                      style={{ width: `${rate}%` }}
+                    <motion.div
+                      className="h-2.5 rounded-full bg-primary"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${rate}%` }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
                     />
                   </div>
                   <div className="flex justify-between text-sm">
