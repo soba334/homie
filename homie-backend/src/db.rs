@@ -581,4 +581,34 @@ pub async fn init_db(pool: &SqlitePool) {
     .execute(pool)
     .await
     .expect("Failed to create files table");
+
+    // ── Push Notifications ──
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create push_subscriptions table");
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS notification_preferences (
+            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            garbage_enabled INTEGER NOT NULL DEFAULT 1,
+            garbage_timing TEXT NOT NULL DEFAULT 'both',
+            subscription_enabled INTEGER NOT NULL DEFAULT 1,
+            subscription_days_before INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create notification_preferences table");
 }
