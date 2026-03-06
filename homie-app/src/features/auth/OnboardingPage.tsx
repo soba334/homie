@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Button } from '@/components/ui';
 import { useAuth } from './useAuth';
 import { api } from '@/utils/api';
@@ -74,8 +75,17 @@ export function OnboardingPage() {
           <p className="text-on-surface-variant text-sm">はじめの設定</p>
         </div>
 
+        <AnimatePresence mode="wait">
         {step === 'nickname' && (
-          <form onSubmit={handleNickname} className="space-y-4">
+          <motion.form
+            key="nickname"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onSubmit={handleNickname}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-sm font-medium mb-1">ニックネーム</label>
               <input
@@ -95,11 +105,18 @@ export function OnboardingPage() {
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? '保存中...' : '次へ'}
             </Button>
-          </form>
+          </motion.form>
         )}
 
         {step === 'home' && (
-          <div className="space-y-4">
+          <motion.div
+            key="home"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="space-y-4"
+          >
             {/* Mode toggle */}
             <div className="flex border border-outline rounded-lg overflow-hidden">
               <button
@@ -161,8 +178,9 @@ export function OnboardingPage() {
                 </Button>
               </form>
             )}
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );
