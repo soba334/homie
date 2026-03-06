@@ -10,6 +10,7 @@ pub mod google_calendar;
 pub mod homes;
 pub mod monthly_budgets;
 pub mod push;
+pub mod receipt;
 pub mod salary;
 pub mod savings;
 pub mod shifts;

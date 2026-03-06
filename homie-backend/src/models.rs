@@ -943,6 +943,30 @@ pub struct UpdateSubscription {
     pub sync_to_calendar: Option<bool>,
 }
 
+// ── Receipt OCR ──
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptScanResult {
+    pub date: Option<String>,
+    pub store: Option<String>,
+    pub items: Vec<ReceiptItem>,
+    pub total: Option<f64>,
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReceiptItem {
+    pub name: String,
+    pub amount: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptScanRequest {
+    pub file_id: String,
+}
+
 // ── Constructors ──
 
 impl GarbageCategory {

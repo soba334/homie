@@ -76,6 +76,27 @@ impl S3Storage {
         Ok(presigned.uri().to_string())
     }
 
+    pub async fn download(&self, key: &str) -> Result<Vec<u8>, AppError> {
+        let resp = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+            .map_err(|e| AppError::Internal(format!("S3 download failed: {e}")))?;
+
+        let bytes = resp
+            .body
+            .collect()
+            .await
+            .map_err(|e| AppError::Internal(format!("S3 download body read failed: {e}")))?
+            .into_bytes()
+            .to_vec();
+
+        Ok(bytes)
+    }
+
     pub async fn delete(&self, key: &str) -> Result<(), AppError> {
         self.client
             .delete_object()

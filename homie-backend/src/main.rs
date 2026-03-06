@@ -267,6 +267,8 @@ async fn main() {
             put(handlers::subscriptions::update_subscription)
                 .delete(handlers::subscriptions::delete_subscription),
         )
+        // Receipt OCR
+        .route("/api/v1/receipt/scan", post(handlers::receipt::scan))
         // Salary
         .route("/api/v1/salary/predict", get(handlers::salary::predict))
         .route(

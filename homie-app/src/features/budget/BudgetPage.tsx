@@ -12,9 +12,10 @@ import { useAccounts } from '@/features/accounts/useAccounts';
 import { useSavings } from '@/features/savings/useSavings';
 import { useSubscriptions } from './useSubscriptions';
 import { useAuth } from '@/features/auth/useAuth';
-import { BudgetEntryForm } from './BudgetEntryForm';
+import { BudgetEntryForm, type BudgetEntryDefaults } from './BudgetEntryForm';
 import { SubscriptionForm } from './SubscriptionForm';
 import type { Subscription, BudgetEntry } from '@/types';
+import { api, API_BASE } from '@/utils/api';
 import { format } from 'date-fns';
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -23,6 +24,14 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 const BUDGET_CATEGORIES = ['食費', '日用品', '光熱費', '家賃', '交通費', '医療費', '娯楽', 'その他'];
+
+interface ReceiptScanResult {
+  date: string | null;
+  store: string | null;
+  items: { name: string; amount: number }[];
+  total: number | null;
+  category: string | null;
+}
 
 type Tab = 'overview' | 'expenses' | 'subscriptions' | 'accounts' | 'savings';
 
@@ -53,6 +62,8 @@ export function BudgetPage() {
   const [showSubForm, setShowSubForm] = useState(false);
   const [editingSub, setEditingSub] = useState<Subscription | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [receiptDefaults, setReceiptDefaults] = useState<BudgetEntryDefaults | null>(null);
 
   // Budget form state
   const [budgetCategory, setBudgetCategory] = useState(BUDGET_CATEGORIES[0]);
@@ -89,6 +100,47 @@ export function BudgetPage() {
       toast('登録に失敗しました', 'error');
     } finally {
       setBudgetSubmitting(false);
+    }
+  }
+
+  async function handleReceiptUpload(files: File[]) {
+    const file = files[0];
+    if (!file) return;
+    setScanning(true);
+    try {
+      // Upload file via multipart FormData
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fetch(`${API_BASE}/api/v1/files`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('ファイルのアップロードに失敗しました');
+      }
+      const uploaded = await uploadRes.json() as { id: string };
+
+      // OCR scan
+      const result = await api.post<ReceiptScanResult>('/api/v1/receipt/scan', { fileId: uploaded.id });
+
+      // Map OCR result to form defaults
+      const totalAmount = result.total ?? (result.items.reduce((s, i) => s + i.amount, 0) || undefined);
+      const desc = result.store || result.items[0]?.name || '';
+      setReceiptDefaults({
+        date: result.date || format(new Date(), 'yyyy-MM-dd'),
+        amount: totalAmount,
+        category: result.category || '食費',
+        description: desc,
+        paidBy: user?.id,
+      });
+
+      setShowUpload(false);
+      setShowEntryForm(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'レシートの読み取りに失敗しました', 'error');
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -466,13 +518,16 @@ export function BudgetPage() {
       </TabContent>
 
       {/* Add Entry Modal */}
-      <Modal open={showEntryForm} onClose={() => setShowEntryForm(false)} title="支出を追加">
+      <Modal open={showEntryForm} onClose={() => { setShowEntryForm(false); setReceiptDefaults(null); }} title="支出を追加">
         <BudgetEntryForm
+          key={receiptDefaults ? 'receipt' : 'manual'}
           addEntry={budget.addEntry}
           updateEntry={budget.updateEntry}
           budgetItems={monthlyBudgets.budgets}
+          defaultValues={receiptDefaults ?? undefined}
           onSubmit={() => {
             setShowEntryForm(false);
+            setReceiptDefaults(null);
             monthlyBudgets.refetch();
             toast('登録しました');
           }}
@@ -559,19 +614,20 @@ export function BudgetPage() {
       </Modal>
 
       {/* Receipt Upload Modal */}
-      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="レシートから読み取り">
-        <FileUpload accept="image/*,video/*" onFileSelect={(files) => {
-          console.log('Receipt files for OCR:', files);
-          setShowUpload(false);
-        }} multiple>
-          <div className="flex flex-col items-center gap-2 text-on-surface-variant">
-            <p className="font-medium">レシートの画像や動画をアップロード</p>
-            <p className="text-sm">複数選択可能</p>
+      <Modal open={showUpload} onClose={() => { if (!scanning) setShowUpload(false); }} title="レシートから読み取り">
+        {scanning ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Spinner />
+            <p className="text-sm text-on-surface-variant">レシートを読み取り中...</p>
           </div>
-        </FileUpload>
-        <p className="text-xs text-on-surface-variant mt-3">
-          ※ OCR処理は今後のアップデートで対応予定です
-        </p>
+        ) : (
+          <FileUpload accept="image/*" onFileSelect={handleReceiptUpload}>
+            <div className="flex flex-col items-center gap-2 text-on-surface-variant">
+              <p className="font-medium">レシートの画像をアップロード</p>
+              <p className="text-sm">写真を撮影または選択してください</p>
+            </div>
+          </FileUpload>
+        )}
       </Modal>
     </div>
   );
