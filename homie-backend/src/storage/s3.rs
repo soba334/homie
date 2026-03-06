@@ -1,7 +1,7 @@
+use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{Credentials, Region};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::Client;
 use std::time::Duration;
 
 use crate::errors::AppError;
@@ -14,12 +14,10 @@ pub struct S3Storage {
 
 impl S3Storage {
     pub async fn new() -> Self {
-        let endpoint = std::env::var("S3_ENDPOINT")
-            .unwrap_or_else(|_| "http://localhost:9000".to_string());
-        let access_key =
-            std::env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set");
-        let secret_key =
-            std::env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set");
+        let endpoint =
+            std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string());
+        let access_key = std::env::var("S3_ACCESS_KEY").expect("S3_ACCESS_KEY must be set");
+        let secret_key = std::env::var("S3_SECRET_KEY").expect("S3_SECRET_KEY must be set");
         let bucket = std::env::var("S3_BUCKET").unwrap_or_else(|_| "homie-files".to_string());
         let region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
 
@@ -60,11 +58,7 @@ impl S3Storage {
         Ok(())
     }
 
-    pub async fn presign_get(
-        &self,
-        key: &str,
-        expires_in: Duration,
-    ) -> Result<String, AppError> {
+    pub async fn presign_get(&self, key: &str, expires_in: Duration) -> Result<String, AppError> {
         let presign_config = PresigningConfig::builder()
             .expires_in(expires_in)
             .build()

@@ -7,13 +7,19 @@ export function useSubscriptions() {
   const [loading, setLoading] = useState(true);
 
   const fetchSubscriptions = useCallback(async () => {
-    const data = await api.get<Subscription[]>('/api/v1/subscriptions');
-    setSubscriptions(data);
+    setLoading(true);
+    try {
+      const data = await api.get<Subscription[]>('/api/v1/subscriptions');
+      setSubscriptions(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchSubscriptions().catch(() => {}).finally(() => setLoading(false));
+    fetchSubscriptions();
   }, [fetchSubscriptions]);
 
   const addSubscription = useCallback(async (input: {

@@ -7,13 +7,19 @@ export function useMonthlyBudgets(yearMonth: string) {
   const [loading, setLoading] = useState(true);
 
   const fetchBudgets = useCallback(async () => {
-    const data = await api.get<BudgetVsActual[]>(`/api/v1/budgets/monthly?year_month=${yearMonth}`);
-    setBudgets(data);
+    setLoading(true);
+    try {
+      const data = await api.get<BudgetVsActual[]>(`/api/v1/budgets/monthly?year_month=${yearMonth}`);
+      setBudgets(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, [yearMonth]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchBudgets().catch(() => {}).finally(() => setLoading(false));
+    fetchBudgets();
   }, [fetchBudgets]);
 
   const upsertBudget = useCallback(async (input: { category: string; amount: number; yearMonth: string }) => {

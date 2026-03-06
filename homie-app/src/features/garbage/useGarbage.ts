@@ -18,10 +18,17 @@ export function useGarbage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchCategories(), fetchSchedules()])
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const load = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchCategories(), fetchSchedules()]);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [fetchCategories, fetchSchedules]);
 
   const addCategory = useCallback(async (category: {

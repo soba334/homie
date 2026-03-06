@@ -1,11 +1,11 @@
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
-use chrono::{Datelike, NaiveDate, Utc, FixedOffset};
+use chrono::{Datelike, FixedOffset, NaiveDate, Utc};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
 use crate::validation::*;
-use crate::AppState;
 
 const SUB_SELECT: &str = "SELECT id, home_id, name, amount, category, paid_by, account_id, billing_cycle, billing_day, next_billing_date, is_active, note, created_at FROM subscriptions";
 
@@ -33,7 +33,11 @@ pub async fn create_subscription(
     let home_id = auth.home_id.as_deref().unwrap().to_string();
     validate_name(&input.name, "name")?;
     validate_amount(input.amount, "amount")?;
-    validate_enum(&input.billing_cycle, &["monthly", "yearly", "weekly"], "billingCycle")?;
+    validate_enum(
+        &input.billing_cycle,
+        &["monthly", "yearly", "weekly"],
+        "billingCycle",
+    )?;
     validate_day_of_month(input.billing_day, "billingDay")?;
     validate_name(&input.category, "category")?;
     let sub = Subscription::new(home_id, input);
@@ -68,13 +72,12 @@ pub async fn update_subscription(
 ) -> Result<Json<Subscription>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap();
 
-    let existing: Subscription = sqlx::query_as(&format!(
-        "{SUB_SELECT} WHERE id = ? AND home_id = ?"
-    ))
-    .bind(&id)
-    .bind(home_id)
-    .fetch_one(&state.pool)
-    .await?;
+    let existing: Subscription =
+        sqlx::query_as(&format!("{SUB_SELECT} WHERE id = ? AND home_id = ?"))
+            .bind(&id)
+            .bind(home_id)
+            .fetch_one(&state.pool)
+            .await?;
 
     let updated = Subscription {
         id: id.clone(),
@@ -86,7 +89,9 @@ pub async fn update_subscription(
         account_id: input.account_id.or(existing.account_id),
         billing_cycle: input.billing_cycle.unwrap_or(existing.billing_cycle),
         billing_day: input.billing_day.unwrap_or(existing.billing_day),
-        next_billing_date: input.next_billing_date.unwrap_or(existing.next_billing_date),
+        next_billing_date: input
+            .next_billing_date
+            .unwrap_or(existing.next_billing_date),
         is_active: input.is_active.unwrap_or(existing.is_active),
         note: input.note.or(existing.note),
         created_at: existing.created_at,
@@ -134,7 +139,10 @@ pub async fn process_due_subscriptions(
     home_id: &str,
 ) -> Result<(), AppError> {
     let jst = FixedOffset::east_opt(9 * 3600).unwrap();
-    let today = Utc::now().with_timezone(&jst).format("%Y-%m-%d").to_string();
+    let today = Utc::now()
+        .with_timezone(&jst)
+        .format("%Y-%m-%d")
+        .to_string();
 
     let due_subs: Vec<Subscription> = sqlx::query_as(&format!(
         "{SUB_SELECT} WHERE home_id = ? AND is_active = 1 AND next_billing_date <= ?"
@@ -186,10 +194,9 @@ pub async fn process_due_subscriptions(
 fn advance_date(date: NaiveDate, cycle: &str) -> NaiveDate {
     match cycle {
         "weekly" => date + chrono::Duration::weeks(1),
-        "yearly" => {
-            date.with_year(date.year() + 1)
-                .unwrap_or(date + chrono::Duration::days(365))
-        }
+        "yearly" => date
+            .with_year(date.year() + 1)
+            .unwrap_or(date + chrono::Duration::days(365)),
         _ => {
             // monthly
             let (y, m) = if date.month() == 12 {

@@ -6,12 +6,12 @@ mod models;
 mod storage;
 mod validation;
 
-use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
+use axum::http::HeaderValue;
+use axum::routing::{delete, get, patch, post, put};
 use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
 use storage::S3Storage;
-use axum::http::HeaderValue;
 use tower_http::cors::CorsLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -139,10 +139,7 @@ async fn main() {
             "/api/v1/garbage/schedules/{id}",
             put(handlers::garbage::update_schedule).delete(handlers::garbage::delete_schedule),
         )
-        .route(
-            "/api/v1/garbage/all",
-            delete(handlers::garbage::delete_all),
-        )
+        .route("/api/v1/garbage/all", delete(handlers::garbage::delete_all))
         // Budget
         .route(
             "/api/v1/budget/entries",
@@ -212,7 +209,8 @@ async fn main() {
         // Monthly Budgets
         .route(
             "/api/v1/budgets/monthly",
-            get(handlers::monthly_budgets::list_budgets).post(handlers::monthly_budgets::upsert_budget),
+            get(handlers::monthly_budgets::list_budgets)
+                .post(handlers::monthly_budgets::upsert_budget),
         )
         .route(
             "/api/v1/budgets/monthly/{id}",
@@ -230,11 +228,13 @@ async fn main() {
         // Employments
         .route(
             "/api/v1/employments",
-            get(handlers::employments::list_employments).post(handlers::employments::create_employment),
+            get(handlers::employments::list_employments)
+                .post(handlers::employments::create_employment),
         )
         .route(
             "/api/v1/employments/{id}",
-            put(handlers::employments::update_employment).delete(handlers::employments::delete_employment),
+            put(handlers::employments::update_employment)
+                .delete(handlers::employments::delete_employment),
         )
         // Shifts
         .route(
@@ -248,17 +248,16 @@ async fn main() {
         // Subscriptions
         .route(
             "/api/v1/subscriptions",
-            get(handlers::subscriptions::list_subscriptions).post(handlers::subscriptions::create_subscription),
+            get(handlers::subscriptions::list_subscriptions)
+                .post(handlers::subscriptions::create_subscription),
         )
         .route(
             "/api/v1/subscriptions/{id}",
-            put(handlers::subscriptions::update_subscription).delete(handlers::subscriptions::delete_subscription),
+            put(handlers::subscriptions::update_subscription)
+                .delete(handlers::subscriptions::delete_subscription),
         )
         // Salary
-        .route(
-            "/api/v1/salary/predict",
-            get(handlers::salary::predict),
-        )
+        .route("/api/v1/salary/predict", get(handlers::salary::predict))
         .route(
             "/api/v1/salary/records",
             get(handlers::salary::list_records).post(handlers::salary::create_record),
@@ -267,9 +266,7 @@ async fn main() {
             "/api/v1/salary/records/{id}",
             put(handlers::salary::update_record).delete(handlers::salary::delete_record),
         )
-        .layer(axum::middleware::from_fn(
-            middleware::auth::require_home,
-        ))
+        .layer(axum::middleware::from_fn(middleware::auth::require_home))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::auth::require_auth,

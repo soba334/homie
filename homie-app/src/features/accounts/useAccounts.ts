@@ -7,13 +7,19 @@ export function useAccounts() {
   const [loading, setLoading] = useState(true);
 
   const fetchAccounts = useCallback(async () => {
-    const data = await api.get<AccountWithBalance[]>('/api/v1/accounts');
-    setAccounts(data);
+    setLoading(true);
+    try {
+      const data = await api.get<AccountWithBalance[]>('/api/v1/accounts');
+      setAccounts(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchAccounts().catch(() => {}).finally(() => setLoading(false));
+    fetchAccounts();
   }, [fetchAccounts]);
 
   const addAccount = useCallback(async (input: {
@@ -53,14 +59,20 @@ export function useAccountTransactions(accountId: string, yearMonth?: string) {
   const [loading, setLoading] = useState(true);
 
   const fetchTransactions = useCallback(async () => {
-    const params = yearMonth ? `?year_month=${yearMonth}` : '';
-    const data = await api.get<AccountTransaction[]>(`/api/v1/accounts/${accountId}/transactions${params}`);
-    setTransactions(data);
+    setLoading(true);
+    try {
+      const params = yearMonth ? `?year_month=${yearMonth}` : '';
+      const data = await api.get<AccountTransaction[]>(`/api/v1/accounts/${accountId}/transactions${params}`);
+      setTransactions(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
   }, [accountId, yearMonth]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchTransactions().catch(() => {}).finally(() => setLoading(false));
+    fetchTransactions();
   }, [fetchTransactions]);
 
   const addTransaction = useCallback(async (input: {

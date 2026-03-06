@@ -5,7 +5,9 @@ const MAX_NAME_LEN: usize = 100;
 
 pub fn validate_amount(amount: f64, field: &str) -> Result<(), AppError> {
     if amount < 0.0 {
-        return Err(AppError::BadRequest(format!("{field} must be non-negative")));
+        return Err(AppError::BadRequest(format!(
+            "{field} must be non-negative"
+        )));
     }
     if amount > 999_999_999.0 {
         return Err(AppError::BadRequest(format!("{field} is too large")));
@@ -15,7 +17,9 @@ pub fn validate_amount(amount: f64, field: &str) -> Result<(), AppError> {
 
 pub fn validate_string_len(s: &str, max: usize, field: &str) -> Result<(), AppError> {
     if s.len() > max {
-        return Err(AppError::BadRequest(format!("{field} is too long (max {max} chars)")));
+        return Err(AppError::BadRequest(format!(
+            "{field} is too long (max {max} chars)"
+        )));
     }
     Ok(())
 }
@@ -34,14 +38,18 @@ pub fn validate_description(s: &str, field: &str) -> Result<(), AppError> {
 
 pub fn validate_day_of_month(day: i32, field: &str) -> Result<(), AppError> {
     if !(1..=31).contains(&day) {
-        return Err(AppError::BadRequest(format!("{field} must be between 1 and 31")));
+        return Err(AppError::BadRequest(format!(
+            "{field} must be between 1 and 31"
+        )));
     }
     Ok(())
 }
 
 pub fn validate_hour(hour: i32, field: &str) -> Result<(), AppError> {
     if !(0..=23).contains(&hour) {
-        return Err(AppError::BadRequest(format!("{field} must be between 0 and 23")));
+        return Err(AppError::BadRequest(format!(
+            "{field} must be between 0 and 23"
+        )));
     }
     Ok(())
 }

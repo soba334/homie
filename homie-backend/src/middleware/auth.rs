@@ -6,9 +6,9 @@ use axum::response::Response;
 use axum_extra::extract::CookieJar;
 use jsonwebtoken::{DecodingKey, Validation};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::{AuthUser, Claims};
-use crate::AppState;
 
 pub async fn require_auth(
     State(state): State<AppState>,
@@ -44,10 +44,7 @@ pub async fn require_auth(
     Ok(next.run(req).await)
 }
 
-pub async fn require_home(
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response, AppError> {
+pub async fn require_home(req: Request<Body>, next: Next) -> Result<Response, AppError> {
     let auth = req
         .extensions()
         .get::<AuthUser>()

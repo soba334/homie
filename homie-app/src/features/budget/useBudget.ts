@@ -20,10 +20,17 @@ export function useBudget(yearMonth?: string) {
   }, [yearMonth]);
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchEntries(), fetchSummary()])
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const load = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchEntries(), fetchSummary()]);
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [fetchEntries, fetchSummary]);
 
   const addEntry = useCallback(async (entry: {

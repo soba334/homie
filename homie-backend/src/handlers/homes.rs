@@ -2,9 +2,9 @@ use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 fn generate_invite_code() -> String {
     use rand::Rng;
@@ -75,12 +75,11 @@ pub async fn invite(
     }
 
     // Check member count
-    let member_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM members WHERE home_id = ?")
-            .bind(&home_id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+    let member_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM members WHERE home_id = ?")
+        .bind(&home_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if member_count >= 2 {
         return Err(AppError::BadRequest(
@@ -118,10 +117,7 @@ pub async fn invite(
     .execute(&state.pool)
     .await?;
 
-    Ok(Json(InviteResponse {
-        code,
-        expires_at,
-    }))
+    Ok(Json(InviteResponse { code, expires_at }))
 }
 
 /// Join a home using invite code
@@ -149,7 +145,9 @@ pub async fn join(
 
     // Check if already used
     if invite.used_by.is_some() {
-        return Err(AppError::BadRequest("招待コードは既に使用されています".to_string()));
+        return Err(AppError::BadRequest(
+            "招待コードは既に使用されています".to_string(),
+        ));
     }
 
     // Check expiry
@@ -157,16 +155,17 @@ pub async fn join(
         .map_err(|e| AppError::Internal(format!("Date parse error: {e}")))?;
 
     if chrono::Utc::now() > expires_at {
-        return Err(AppError::BadRequest("招待コードの有効期限が切れています".to_string()));
+        return Err(AppError::BadRequest(
+            "招待コードの有効期限が切れています".to_string(),
+        ));
     }
 
     // Check home member count
-    let member_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM members WHERE home_id = ?")
-            .bind(&invite.home_id)
-            .fetch_one(&state.pool)
-            .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+    let member_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM members WHERE home_id = ?")
+        .bind(&invite.home_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     if member_count >= 2 {
         return Err(AppError::BadRequest(
@@ -193,11 +192,10 @@ pub async fn join(
         .await?;
 
     // Get home name
-    let home: Home =
-        sqlx::query_as("SELECT id, name, created_at FROM homes WHERE id = ?")
-            .bind(&invite.home_id)
-            .fetch_one(&state.pool)
-            .await?;
+    let home: Home = sqlx::query_as("SELECT id, name, created_at FROM homes WHERE id = ?")
+        .bind(&invite.home_id)
+        .fetch_one(&state.pool)
+        .await?;
 
     Ok(Json(JoinResponse {
         home_id: home.id,

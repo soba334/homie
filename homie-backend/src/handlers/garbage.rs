@@ -1,9 +1,9 @@
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 
+use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
-use crate::AppState;
 
 // ── Categories ──
 
@@ -13,11 +13,12 @@ pub async fn list_categories(
 ) -> Result<Json<Vec<GarbageCategory>>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap();
 
-    let mut categories: Vec<GarbageCategory> =
-        sqlx::query_as("SELECT id, home_id, name, color, description FROM garbage_categories WHERE home_id = ?")
-            .bind(home_id)
-            .fetch_all(&state.pool)
-            .await?;
+    let mut categories: Vec<GarbageCategory> = sqlx::query_as(
+        "SELECT id, home_id, name, color, description FROM garbage_categories WHERE home_id = ?",
+    )
+    .bind(home_id)
+    .fetch_all(&state.pool)
+    .await?;
 
     for cat in &mut categories {
         let items: Vec<(String,)> =
@@ -142,11 +143,12 @@ pub async fn list_schedules(
 ) -> Result<Json<Vec<GarbageSchedule>>, AppError> {
     let home_id = auth.home_id.as_deref().unwrap();
 
-    let mut schedules: Vec<GarbageSchedule> =
-        sqlx::query_as("SELECT id, home_id, category_id, location, note FROM garbage_schedules WHERE home_id = ?")
-            .bind(home_id)
-            .fetch_all(&state.pool)
-            .await?;
+    let mut schedules: Vec<GarbageSchedule> = sqlx::query_as(
+        "SELECT id, home_id, category_id, location, note FROM garbage_schedules WHERE home_id = ?",
+    )
+    .bind(home_id)
+    .fetch_all(&state.pool)
+    .await?;
 
     for s in &mut schedules {
         let days: Vec<(i32,)> =
@@ -156,11 +158,12 @@ pub async fn list_schedules(
                 .await?;
         s.day_of_week = days.into_iter().map(|(d,)| d).collect();
 
-        let weeks: Vec<(i32,)> =
-            sqlx::query_as("SELECT week_of_month FROM garbage_schedule_weeks WHERE schedule_id = ?")
-                .bind(&s.id)
-                .fetch_all(&state.pool)
-                .await?;
+        let weeks: Vec<(i32,)> = sqlx::query_as(
+            "SELECT week_of_month FROM garbage_schedule_weeks WHERE schedule_id = ?",
+        )
+        .bind(&s.id)
+        .fetch_all(&state.pool)
+        .await?;
         s.week_of_month = if weeks.is_empty() {
             None
         } else {
@@ -198,11 +201,13 @@ pub async fn create_schedule(
 
     if let Some(ref weeks) = schedule.week_of_month {
         for week in weeks {
-            sqlx::query("INSERT INTO garbage_schedule_weeks (schedule_id, week_of_month) VALUES (?, ?)")
-                .bind(&schedule.id)
-                .bind(week)
-                .execute(&state.pool)
-                .await?;
+            sqlx::query(
+                "INSERT INTO garbage_schedule_weeks (schedule_id, week_of_month) VALUES (?, ?)",
+            )
+            .bind(&schedule.id)
+            .bind(week)
+            .execute(&state.pool)
+            .await?;
         }
     }
 
@@ -243,11 +248,13 @@ pub async fn update_schedule(
             .execute(&state.pool)
             .await?;
         for day in &days {
-            sqlx::query("INSERT INTO garbage_schedule_days (schedule_id, day_of_week) VALUES (?, ?)")
-                .bind(&id)
-                .bind(day)
-                .execute(&state.pool)
-                .await?;
+            sqlx::query(
+                "INSERT INTO garbage_schedule_days (schedule_id, day_of_week) VALUES (?, ?)",
+            )
+            .bind(&id)
+            .bind(day)
+            .execute(&state.pool)
+            .await?;
         }
         days
     } else {
@@ -265,20 +272,27 @@ pub async fn update_schedule(
             .execute(&state.pool)
             .await?;
         for week in &weeks {
-            sqlx::query("INSERT INTO garbage_schedule_weeks (schedule_id, week_of_month) VALUES (?, ?)")
-                .bind(&id)
-                .bind(week)
-                .execute(&state.pool)
-                .await?;
+            sqlx::query(
+                "INSERT INTO garbage_schedule_weeks (schedule_id, week_of_month) VALUES (?, ?)",
+            )
+            .bind(&id)
+            .bind(week)
+            .execute(&state.pool)
+            .await?;
         }
         if weeks.is_empty() { None } else { Some(weeks) }
     } else {
-        let rows: Vec<(i32,)> =
-            sqlx::query_as("SELECT week_of_month FROM garbage_schedule_weeks WHERE schedule_id = ?")
-                .bind(&id)
-                .fetch_all(&state.pool)
-                .await?;
-        if rows.is_empty() { None } else { Some(rows.into_iter().map(|(w,)| w).collect()) }
+        let rows: Vec<(i32,)> = sqlx::query_as(
+            "SELECT week_of_month FROM garbage_schedule_weeks WHERE schedule_id = ?",
+        )
+        .bind(&id)
+        .fetch_all(&state.pool)
+        .await?;
+        if rows.is_empty() {
+            None
+        } else {
+            Some(rows.into_iter().map(|(w,)| w).collect())
+        }
     };
 
     Ok(Json(GarbageSchedule {

@@ -1007,7 +1007,11 @@ impl CalendarEvent {
         }
     }
 
-    pub fn to_expanded(&self, is_instance: bool, occurrence_date: Option<String>) -> ExpandedCalendarEvent {
+    pub fn to_expanded(
+        &self,
+        is_instance: bool,
+        occurrence_date: Option<String>,
+    ) -> ExpandedCalendarEvent {
         ExpandedCalendarEvent {
             id: self.id.clone(),
             home_id: self.home_id.clone(),
@@ -1025,7 +1029,11 @@ impl CalendarEvent {
             recurrence_interval: self.recurrence_interval,
             recurrence_end: self.recurrence_end.clone(),
             is_recurrence_instance: is_instance,
-            original_event_id: if is_instance { Some(self.id.clone()) } else { None },
+            original_event_id: if is_instance {
+                Some(self.id.clone())
+            } else {
+                None
+            },
             occurrence_date,
             garbage_schedule_id: None,
             google_calendar_id: self.google_calendar_id.clone(),
