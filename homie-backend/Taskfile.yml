@@ -1,0 +1,72 @@
+version: "3"
+
+vars:
+  CARGO: cargo
+
+tasks:
+  dev:
+    desc: 開発サーバー起動 (ホットリロード)
+    cmd: cargo watch -x run
+    aliases: [d]
+
+  run:
+    desc: サーバー起動
+    cmd: cargo run
+    aliases: [r]
+
+  build:
+    desc: ビルド
+    cmd: cargo build
+    aliases: [b]
+
+  build:release:
+    desc: リリースビルド
+    cmd: cargo build --release
+
+  check:
+    desc: コンパイルチェック (ビルドより高速)
+    cmd: cargo check
+    aliases: [c]
+
+  lint:
+    desc: Clippy lint
+    cmd: cargo clippy -- -D warnings
+    aliases: [l]
+
+  fmt:
+    desc: コードフォーマット
+    cmd: cargo fmt
+
+  fmt:check:
+    desc: フォーマットチェック
+    cmd: cargo fmt -- --check
+
+  test:
+    desc: テスト実行
+    cmd: cargo test
+    aliases: [t]
+
+  ci:
+    desc: CI チェック (fmt + clippy + test + build)
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
+      - task: build
+
+  clean:
+    desc: ビルド成果物削除
+    cmd: cargo clean
+
+  db:reset:
+    desc: DBファイル削除 (再起動で再作成)
+    cmd: rm -f homie.db
+    prompt: DBを削除しますか？
+
+  setup:
+    desc: 初回セットアップ
+    cmds:
+      - cp -n .env.example .env || true
+      - cargo build
+    status:
+      - test -f .env
