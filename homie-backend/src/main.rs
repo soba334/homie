@@ -194,9 +194,14 @@ async fn main() {
             "/api/v1/documents",
             get(handlers::documents::list_documents).post(handlers::documents::create_document),
         )
+        .route("/api/v1/documents/ask", post(handlers::document_ai::ask))
         .route(
             "/api/v1/documents/{id}",
             put(handlers::documents::update_document).delete(handlers::documents::delete_document),
+        )
+        .route(
+            "/api/v1/documents/{id}/extract-text",
+            post(handlers::document_ai::extract_text),
         )
         // Accounts
         .route(

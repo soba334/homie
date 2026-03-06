@@ -2,6 +2,7 @@ pub mod accounts;
 pub mod auth;
 pub mod budget;
 pub mod calendar;
+pub mod document_ai;
 pub mod documents;
 pub mod employments;
 pub mod files;

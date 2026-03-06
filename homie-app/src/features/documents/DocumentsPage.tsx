@@ -1,15 +1,18 @@
 import { useState, useCallback } from 'react';
-import { FileText, Plus, Trash2, ExternalLink } from 'lucide-react';
-import { Card, Button, SearchInput, Modal, Spinner } from '@/components/ui';
+import { FileText, Plus, Trash2, ExternalLink, MessageCircleQuestionMark, ScanText } from 'lucide-react';
+import { Card, Button, SearchInput, Modal, Spinner, useToast } from '@/components/ui';
 import { useDocuments } from './useDocuments';
 import { DocumentForm } from './DocumentForm';
+import { DocumentAskModal } from './DocumentAskModal';
 import { format } from 'date-fns';
+import { api } from '@/utils/api';
 import type { Document } from '@/types';
 
 export function DocumentsPage() {
   const { documents, loading, searchDocuments, groupedByCategory, deleteDocument } = useDocuments();
   const [query, setQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showAskModal, setShowAskModal] = useState(false);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -34,10 +37,16 @@ export function DocumentsPage() {
           <FileText size={24} />
           書類管理
         </h1>
-        <Button size="sm" onClick={() => setShowForm(true)}>
-          <Plus size={16} className="inline mr-1" />
-          書類追加
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowAskModal(true)}>
+            <MessageCircleQuestionMark size={16} className="inline mr-1" />
+            資料に質問
+          </Button>
+          <Button size="sm" onClick={() => setShowForm(true)}>
+            <Plus size={16} className="inline mr-1" />
+            書類追加
+          </Button>
+        </div>
       </div>
 
       <SearchInput
@@ -82,11 +91,28 @@ export function DocumentsPage() {
       <Modal open={showForm} onClose={() => setShowForm(false)} title="書類を追加">
         <DocumentForm onSubmit={() => setShowForm(false)} />
       </Modal>
+
+      <DocumentAskModal open={showAskModal} onClose={() => setShowAskModal(false)} />
     </div>
   );
 }
 
 function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
+  const { toast } = useToast();
+  const [extracting, setExtracting] = useState(false);
+
+  const handleExtract = async () => {
+    setExtracting(true);
+    try {
+      await api.post(`/api/v1/documents/${doc.id}/extract-text`, {});
+      toast('テキストを抽出しました');
+    } catch {
+      toast('テキスト抽出に失敗しました', 'error');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   return (
     <Card>
       <div className="flex items-start justify-between">
@@ -108,6 +134,9 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: () => void }
           </div>
         </div>
         <div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={handleExtract} disabled={extracting}>
+            <ScanText size={14} />
+          </Button>
           {doc.fileUrl && (
             <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-surface-container rounded-lg">
               <ExternalLink size={14} />

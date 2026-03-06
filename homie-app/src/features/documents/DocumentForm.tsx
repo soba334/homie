@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, FileUpload } from '@/components/ui';
 import { useDocuments } from './useDocuments';
+import { api } from '@/utils/api';
 
 const CATEGORIES = [
   { value: 'contract', label: '契約書' },
@@ -39,7 +40,7 @@ export function DocumentForm({ onSubmit }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await addDocument({
+      const created = await addDocument({
         title: title.trim(),
         category,
         fileUrl,
@@ -47,6 +48,8 @@ export function DocumentForm({ onSubmit }: Props) {
         tags: tagsText.split(/[,、\n]/).map((s) => s.trim()).filter(Boolean),
         note: note.trim() || undefined,
       });
+      // Trigger text extraction in background (silent fail)
+      api.post(`/api/v1/documents/${created.id}/extract-text`, {}).catch(() => {});
       onSubmit();
     } catch (err) {
       setError(err instanceof Error ? err.message : '追加に失敗しました');
