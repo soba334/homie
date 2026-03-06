@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { ToastProvider } from '@/components/ui';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { GarbagePage } from '@/features/garbage';
@@ -50,22 +51,24 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={auth}>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="garbage" element={<GarbagePage />} />
-            <Route path="budget" element={<BudgetPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="documents" element={<DocumentsPage />} />
-            <Route path="accounts" element={<AccountsPage />} />
-            <Route path="monthly-budgets" element={<MonthlyBudgetsPage />} />
-            <Route path="savings" element={<SavingsPage />} />
-            <Route path="employment" element={<EmploymentPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="garbage" element={<GarbagePage />} />
+              <Route path="budget" element={<BudgetPage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="monthly-budgets" element={<MonthlyBudgetsPage />} />
+              <Route path="savings" element={<SavingsPage />} />
+              <Route path="employment" element={<EmploymentPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthContext.Provider>
   );
 }

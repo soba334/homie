@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { PiggyBank, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Card, Button, Modal, Spinner } from '@/components/ui';
+import { Card, Button, Modal, Spinner, useToast } from '@/components/ui';
 import { useSavings } from './useSavings';
 import { format } from 'date-fns';
 
 export function SavingsPage() {
   const { goals, loading, addGoal, updateGoal } = useSavings();
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<string | null>(null);
 
@@ -74,8 +75,10 @@ export function SavingsPage() {
       }
       resetForm();
       setShowForm(false);
+      toast(editingGoal ? '更新しました' : '登録しました');
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました');
+      toast(editingGoal ? '更新に失敗しました' : '登録に失敗しました', 'error');
     } finally {
       setSubmitting(false);
     }
