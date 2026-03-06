@@ -266,17 +266,15 @@ pub async fn create_record(
     let home_id = auth.home_id.as_deref().unwrap().to_string();
     // Fall back to employment's deposit_account_id if not specified
     let mut input = input;
-    if input.deposit_account_id.is_none() {
-        if let Ok(emp) = sqlx::query_as::<_, Employment>(
+    if input.deposit_account_id.is_none() && let Ok(emp) = sqlx::query_as::<_, Employment>(
             "SELECT id, user_id, home_id, name, type, hourly_rate, night_start_hour, night_end_hour, night_rate_multiplier, holiday_rate_multiplier, overtime_threshold_minutes, overtime_rate_multiplier, monthly_salary, transport_allowance, pay_day, social_insurance_rate, income_tax_rate, color, note, deposit_account_id, created_at FROM employments WHERE id = ? AND home_id = ?",
         )
         .bind(&input.employment_id)
         .bind(&home_id)
         .fetch_one(&state.pool)
         .await
-        {
-            input.deposit_account_id = emp.deposit_account_id;
-        }
+    {
+        input.deposit_account_id = emp.deposit_account_id;
     }
     let record = SalaryRecord::new(auth.user_id.clone(), home_id, input);
 

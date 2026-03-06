@@ -379,7 +379,7 @@ pub async fn list_calendars(
         .map(|c| {
             let saved = selections.iter().find(|s| s.calendar_id == c.id);
             // Default: all calendars visible (selected=true)
-            let selected = saved.map_or(true, |s| s.selected);
+            let selected = saved.is_none_or(|s| s.selected);
 
             GoogleCalendarInfo {
                 id: c.id,
