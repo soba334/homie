@@ -5,7 +5,7 @@ import type { GarbageCategory } from '@/types';
 const PRESET_COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280', '#0ea5e9'];
 
 interface Props {
-  addCategory: (category: { name: string; color: string; description: string; items: string[] }) => Promise<void>;
+  addCategory: (category: { name: string; color: string; description: string; items: string[] }) => Promise<unknown>;
   updateCategory: (id: string, updates: Partial<GarbageCategory>) => Promise<void>;
   onSubmit: () => void;
   initial?: GarbageCategory;

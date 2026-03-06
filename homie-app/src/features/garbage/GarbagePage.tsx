@@ -1,10 +1,28 @@
 import { useState } from 'react';
-import { Trash2, Plus, Pencil } from 'lucide-react';
+import { Trash2, Plus, Pencil, HelpCircle } from 'lucide-react';
 import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
 import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
+import { GarbageSortModal } from './GarbageSortModal';
+import { api, API_BASE } from '@/utils/api';
 import type { GarbageCategory, GarbageSchedule } from '@/types';
+
+interface GarbageExtractCategory {
+  name: string;
+  color: string;
+  description: string;
+  items: string[];
+  schedule?: {
+    dayOfWeek: number[];
+    weekOfMonth: number[];
+    note?: string;
+  };
+}
+
+interface GarbageExtractResult {
+  categories: GarbageExtractCategory[];
+}
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -17,6 +35,10 @@ export function GarbagePage() {
   const [showUpload, setShowUpload] = useState(false);
   const [editingCategory, setEditingCategory] = useState<GarbageCategory | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<GarbageSchedule | null>(null);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractedData, setExtractedData] = useState<GarbageExtractResult | null>(null);
+  const [registering, setRegistering] = useState(false);
 
   const searchResults = query ? searchItems(query) : categories;
 
@@ -40,6 +62,10 @@ export function GarbagePage() {
           ゴミ出し管理
         </h1>
         <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowSortModal(true)}>
+            <HelpCircle size={16} className="inline mr-1" />
+            何ゴミ？
+          </Button>
           <Button size="sm" variant="secondary" onClick={() => setShowUpload(true)}>
             画像/PDFから登録
           </Button>
@@ -238,20 +264,145 @@ export function GarbagePage() {
         )}
       </Modal>
 
-      <Modal open={showUpload} onClose={() => setShowUpload(false)} title="画像/PDFからゴミ情報を登録">
-        <FileUpload accept="image/*,.pdf" onFileSelect={(files) => {
-          console.log('Uploaded files for OCR processing:', files);
-          setShowUpload(false);
-        }}>
-          <div className="flex flex-col items-center gap-2 text-on-surface-variant">
-            <p className="font-medium">ゴミカレンダーや分別表をアップロード</p>
-            <p className="text-sm">画像またはPDFファイルを選択</p>
+      <Modal
+        open={showUpload}
+        onClose={() => {
+          if (!extracting && !registering) {
+            setShowUpload(false);
+            setExtractedData(null);
+            setExtracting(false);
+          }
+        }}
+        title="画像/PDFからゴミ情報を登録"
+      >
+        {extracting ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Spinner />
+            <p className="text-sm text-on-surface-variant">分別表を読み取り中...</p>
           </div>
-        </FileUpload>
-        <p className="text-xs text-on-surface-variant mt-3">
-          ※ OCR処理は今後のアップデートで対応予定です。現在は手動入力をご利用ください。
-        </p>
+        ) : extractedData ? (
+          <div className="space-y-3">
+            <p className="text-sm text-on-surface-variant">
+              {extractedData.categories.length}件の分類が見つかりました。内容を確認して登録してください。
+            </p>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {extractedData.categories.map((cat, i) => (
+                <Card key={i} className="text-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className="w-3 h-3 rounded-full inline-block shrink-0"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    <span className="font-bold">{cat.name}</span>
+                  </div>
+                  {cat.description && (
+                    <p className="text-xs text-on-surface-variant mb-1">{cat.description}</p>
+                  )}
+                  {cat.items.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {cat.items.map((item) => (
+                        <span key={item} className="px-2 py-0.5 bg-surface-container rounded text-xs">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {cat.schedule && cat.schedule.dayOfWeek.length > 0 && (
+                    <p className="text-xs text-on-surface-variant">
+                      収集日: {cat.schedule.dayOfWeek.map((d) => DAY_NAMES[d]).join('・')}
+                      {cat.schedule.weekOfMonth.length > 0 && (
+                        <span className="ml-1">
+                          第{cat.schedule.weekOfMonth.join('・')}週
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </Card>
+              ))}
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                className="text-sm text-primary hover:underline cursor-pointer"
+                onClick={() => setExtractedData(null)}
+              >
+                やり直す
+              </button>
+              <Button
+                disabled={registering}
+                onClick={async () => {
+                  setRegistering(true);
+                  try {
+                    for (const cat of extractedData.categories) {
+                      const created = await addCategory({
+                        name: cat.name,
+                        color: cat.color,
+                        description: cat.description,
+                        items: cat.items,
+                      });
+                      if (cat.schedule && created) {
+                        await addSchedule({
+                          categoryId: created.id,
+                          dayOfWeek: cat.schedule.dayOfWeek,
+                          weekOfMonth: cat.schedule.weekOfMonth,
+                          note: cat.schedule.note,
+                        });
+                      }
+                    }
+                    await refetch();
+                    toast('全ての分類を登録しました');
+                    setShowUpload(false);
+                    setExtractedData(null);
+                  } catch {
+                    toast('登録に失敗しました', 'error');
+                  } finally {
+                    setRegistering(false);
+                  }
+                }}
+              >
+                {registering ? '登録中...' : '全て登録する'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <FileUpload accept="image/*,.pdf" onFileSelect={async (files) => {
+            const file = files[0];
+            if (!file) return;
+            setExtracting(true);
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              const uploadRes = await fetch(`${API_BASE}/api/v1/files`, {
+                method: 'POST',
+                credentials: 'include',
+                body: formData,
+              });
+              if (!uploadRes.ok) {
+                throw new Error('ファイルのアップロードに失敗しました');
+              }
+              const uploaded = await uploadRes.json() as { id: string };
+              const result = await api.post<GarbageExtractResult>('/api/v1/garbage/extract', { fileId: uploaded.id });
+              setExtractedData(result);
+            } catch {
+              toast('読み取りに失敗しました', 'error');
+            } finally {
+              setExtracting(false);
+            }
+          }}>
+            <div className="flex flex-col items-center gap-2 text-on-surface-variant">
+              <p className="font-medium">ゴミカレンダーや分別表をアップロード</p>
+              <p className="text-sm">画像またはPDFファイルを選択</p>
+            </div>
+          </FileUpload>
+        )}
       </Modal>
+
+      <GarbageSortModal
+        open={showSortModal}
+        onClose={() => setShowSortModal(false)}
+        categories={categories}
+        schedules={schedules}
+      />
     </div>
   );
 }
