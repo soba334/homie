@@ -14,6 +14,14 @@ const ACCOUNT_TYPE_LABEL: Record<string, string> = {
 
 const DEFAULT_CATEGORIES = ['食費', '日用品', '光熱費', '家賃', '交通費', '医療費', '娯楽', 'その他'];
 
+export interface BudgetEntryDefaults {
+  date?: string;
+  amount?: number;
+  category?: string;
+  description?: string;
+  paidBy?: string;
+}
+
 interface Props {
   addEntry: (entry: {
     date: string;
@@ -27,9 +35,10 @@ interface Props {
   onSubmit: () => void;
   budgetItems?: BudgetVsActual[];
   initial?: BudgetEntry;
+  defaultValues?: BudgetEntryDefaults;
 }
 
-export function BudgetEntryForm({ addEntry, updateEntry, onSubmit, budgetItems, initial }: Props) {
+export function BudgetEntryForm({ addEntry, updateEntry, onSubmit, budgetItems, initial, defaultValues }: Props) {
   const { user } = useAuth();
   const { accounts } = useAccounts();
   const members = user?.home?.members ?? [];
@@ -43,12 +52,13 @@ export function BudgetEntryForm({ addEntry, updateEntry, onSubmit, budgetItems, 
     ...DEFAULT_CATEGORIES.filter((c) => !budgetCategories.includes(c)),
   ];
 
-  const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
-  const [category, setCategory] = useState(initial?.category || allCategories[0] || DEFAULT_CATEGORIES[0]);
-  const [description, setDescription] = useState(initial?.description || '');
-  const [paidBy, setPaidBy] = useState(initial?.paidBy || user?.id || '');
+  const defaults = initial || defaultValues;
+  const [amount, setAmount] = useState(defaults?.amount ? String(defaults.amount) : '');
+  const [category, setCategory] = useState(defaults?.category || allCategories[0] || DEFAULT_CATEGORIES[0]);
+  const [description, setDescription] = useState(defaults?.description || '');
+  const [paidBy, setPaidBy] = useState(defaults?.paidBy || user?.id || '');
   const [accountId, setAccountId] = useState<string>(initial?.accountId || '');
-  const [date, setDate] = useState(initial?.date || format(new Date(), 'yyyy-MM-dd'));
+  const [date, setDate] = useState(defaults?.date || format(new Date(), 'yyyy-MM-dd'));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
