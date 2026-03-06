@@ -39,12 +39,12 @@ export function AppLayout() {
   return (
     <div className="min-h-screen pb-20">
       <header className="bg-surface border-b border-outline sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-3">
+        <div className="max-w-4xl mx-auto px-4 py-3">
           <h1 className="text-lg font-bold text-primary">homie</h1>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-6">
         <Outlet />
       </main>
 
@@ -62,7 +62,7 @@ export function AppLayout() {
           moreOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
-        <div className="max-w-2xl mx-auto bg-surface border border-outline rounded-t-2xl shadow-lg px-4 py-4">
+        <div className="max-w-4xl mx-auto bg-surface border border-outline rounded-t-2xl shadow-lg px-4 py-4">
           <div className="grid grid-cols-2 gap-3">
             {MORE_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
               <NavLink
@@ -86,7 +86,7 @@ export function AppLayout() {
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-surface border-t border-outline z-50">
-        <div className="max-w-2xl mx-auto flex">
+        <div className="max-w-4xl mx-auto flex">
           {MAIN_NAV_ITEMS.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
