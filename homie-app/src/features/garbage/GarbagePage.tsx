@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus, Pencil, HelpCircle } from 'lucide-react';
 import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
@@ -30,7 +30,7 @@ const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 export function GarbagePage() {
   const { categories, schedules, loading, searchItems, deleteCategory, deleteSchedule, deleteAll, todaySchedules, addCategory, updateCategory, addSchedule, updateSchedule, refetch } = useGarbage();
   const { toast } = useToast();
-  const { addJob, activeJobIds } = useBackgroundJobs();
+  const { addJob, activeJobIds, completedJobs, consumeJob } = useBackgroundJobs();
   const [query, setQuery] = useState('');
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -43,6 +43,18 @@ export function GarbagePage() {
   const [registering, setRegistering] = useState(false);
 
   const hasActiveJob = activeJobIds.length > 0;
+
+  // Pick up completed garbage_extract jobs from the global context
+  useEffect(() => {
+    const done = completedJobs.find((j) => j.jobType === 'garbage_extract');
+    if (!done) return;
+    consumeJob(done.id);
+    if (done.status === 'completed' && done.result) {
+      const result = JSON.parse(done.result) as GarbageExtractResult;
+      setExtractedData(result);
+      setShowUpload(true);
+    }
+  }, [completedJobs, consumeJob]);
 
   const searchResults = query ? searchItems(query) : categories;
 
@@ -395,17 +407,7 @@ export function GarbagePage() {
               }
               const uploaded = await uploadRes.json() as { id: string };
               const resp = await api.post<{ jobId: string }>('/api/v1/garbage/extract', { fileId: uploaded.id });
-              addJob(resp.jobId, {
-                onComplete: (resultJson) => {
-                  const result = JSON.parse(resultJson) as GarbageExtractResult;
-                  setExtractedData(result);
-                  setShowUpload(true);
-                  toast('読み取り完了');
-                },
-                onFail: (error) => {
-                  toast(error || '読み取りに失敗しました', 'error');
-                },
-              });
+              addJob(resp.jobId, 'garbage_extract');
               setShowUpload(false);
               toast('バックグラウンドで読み取り中...');
             } catch {
