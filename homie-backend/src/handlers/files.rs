@@ -78,6 +78,7 @@ pub async fn upload(
     Extension(auth): Extension<AuthUser>,
     mut multipart: Multipart,
 ) -> Result<Json<FileUploadResponse>, AppError> {
+    tracing::info!("File upload request received");
     let home_id = auth
         .home_id
         .as_deref()
@@ -131,10 +132,12 @@ pub async fn upload(
     let size = bytes.len() as i64;
 
     // Upload to S3
+    tracing::info!("Uploading to S3: {s3_key} ({size} bytes)");
     state
         .storage
         .upload(&s3_key, bytes.clone(), &content_type)
         .await?;
+    tracing::info!("S3 upload complete");
 
     // Generate thumbnail for images
     let thumbnail_key = if is_image(&content_type) {
