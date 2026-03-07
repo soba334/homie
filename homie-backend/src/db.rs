@@ -666,4 +666,23 @@ pub async fn init_db(pool: &SqlitePool) {
     .execute(pool)
     .await
     .expect("Failed to create document_texts_au trigger");
+
+    // ── Background Jobs ──
+
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS background_jobs (
+            id TEXT PRIMARY KEY,
+            home_id TEXT NOT NULL REFERENCES homes(id),
+            type TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            input TEXT,
+            result TEXT,
+            error TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at TEXT
+        )",
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to create background_jobs table");
 }

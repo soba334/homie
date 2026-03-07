@@ -9,6 +9,7 @@ pub mod files;
 pub mod garbage;
 pub mod google_calendar;
 pub mod homes;
+pub mod jobs;
 pub mod monthly_budgets;
 pub mod push;
 pub mod receipt;

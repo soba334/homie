@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus, Pencil, HelpCircle } from 'lucide-react';
 import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
@@ -6,7 +6,7 @@ import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
 import { GarbageSortModal } from './GarbageSortModal';
 import { api, API_BASE } from '@/utils/api';
-import type { GarbageCategory, GarbageSchedule } from '@/types';
+import type { GarbageCategory, GarbageSchedule, BackgroundJob } from '@/types';
 
 interface GarbageExtractCategory {
   name: string;
@@ -39,6 +39,29 @@ export function GarbagePage() {
   const [extracting, setExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState<GarbageExtractResult | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeJobId) return;
+    const interval = setInterval(async () => {
+      try {
+        const job = await api.get<BackgroundJob>(`/api/v1/jobs/${activeJobId}`);
+        if (job.status === 'completed' && job.result) {
+          setActiveJobId(null);
+          const result = JSON.parse(job.result) as GarbageExtractResult;
+          setExtractedData(result);
+          setShowUpload(true);
+          toast('読み取り完了');
+        } else if (job.status === 'failed') {
+          setActiveJobId(null);
+          toast(job.error || '読み取りに失敗しました', 'error');
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeJobId, toast]);
 
   const searchResults = query ? searchItems(query) : categories;
 
@@ -75,6 +98,15 @@ export function GarbagePage() {
           </Button>
         </div>
       </div>
+
+      {activeJobId && (
+        <Card className="border-primary bg-primary/5">
+          <div className="flex items-center gap-3">
+            <Spinner size={16} />
+            <span className="text-sm">分別表を読み取り中...</span>
+          </div>
+        </Card>
+      )}
 
       {todayCategories.length > 0 && (
         <Card className="border-primary bg-primary/5">
@@ -381,10 +413,12 @@ export function GarbagePage() {
                 throw new Error('ファイルのアップロードに失敗しました');
               }
               const uploaded = await uploadRes.json() as { id: string };
-              const result = await api.post<GarbageExtractResult>('/api/v1/garbage/extract', { fileId: uploaded.id });
-              setExtractedData(result);
+              const resp = await api.post<{ jobId: string }>('/api/v1/garbage/extract', { fileId: uploaded.id });
+              setActiveJobId(resp.jobId);
+              setShowUpload(false);
+              toast('バックグラウンドで読み取り中...');
             } catch {
-              toast('読み取りに失敗しました', 'error');
+              toast('アップロードに失敗しました', 'error');
             } finally {
               setExtracting(false);
             }

@@ -286,6 +286,8 @@ async fn main() {
             "/api/v1/salary/records/{id}",
             put(handlers::salary::update_record).delete(handlers::salary::delete_record),
         )
+        // Background Jobs
+        .route("/api/v1/jobs/{id}", get(handlers::jobs::get_job))
         .layer(axum::middleware::from_fn(middleware::auth::require_home))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
