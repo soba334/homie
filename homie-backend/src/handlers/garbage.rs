@@ -457,7 +457,11 @@ pub async fn extract(
         .map_err(|e| AppError::Internal(format!("Ollama request failed: {e}")))?;
 
     let elapsed = start.elapsed();
-    tracing::info!("Ollama responded in {:.1}s (status: {})", elapsed.as_secs_f64(), resp.status());
+    tracing::info!(
+        "Ollama responded in {:.1}s (status: {})",
+        elapsed.as_secs_f64(),
+        resp.status()
+    );
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -474,7 +478,10 @@ pub async fn extract(
 
     // 4. Parse the response into a structured result
     let content = ollama_resp.message.map(|m| m.content).unwrap_or_default();
-    tracing::info!("Ollama garbage extract raw response ({} chars): {content}", content.len());
+    tracing::info!(
+        "Ollama garbage extract raw response ({} chars): {content}",
+        content.len()
+    );
     let json_str = extract_json_from_response(&content);
     tracing::info!("Ollama garbage extract parsed JSON: {json_str}");
 
