@@ -432,7 +432,7 @@ pub async fn extract(
                 let _ = sqlx::query(
                     "UPDATE background_jobs SET status = 'failed', error = ?, completed_at = datetime('now') WHERE id = ?",
                 )
-                .bind(&format!("{e:?}"))
+                .bind(format!("{e:?}"))
                 .bind(&job_id_clone)
                 .execute(&pool)
                 .await;
