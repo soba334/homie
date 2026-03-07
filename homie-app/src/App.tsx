@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ToastProvider } from '@/components/ui';
+import { BackgroundJobsProvider } from '@/hooks/BackgroundJobsProvider';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { GarbagePage } from '@/features/garbage';
@@ -52,6 +53,7 @@ export default function App() {
   return (
     <AuthContext.Provider value={auth}>
       <ToastProvider>
+        <BackgroundJobsProvider>
         <BrowserRouter>
           <Routes>
             <Route element={<AppLayout />}>
@@ -68,6 +70,7 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+        </BackgroundJobsProvider>
       </ToastProvider>
     </AuthContext.Provider>
   );
