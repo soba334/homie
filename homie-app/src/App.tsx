@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ToastProvider } from '@/components/ui';
-import { BackgroundJobsProvider } from '@/hooks/useBackgroundJobs';
+import { BackgroundJobsProvider } from '@/hooks/BackgroundJobsProvider';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { GarbagePage } from '@/features/garbage';
