@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Trash2, Plus, Pencil, HelpCircle } from 'lucide-react';
 import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
 import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
 import { GarbageSortModal } from './GarbageSortModal';
+import { useBackgroundJobs } from '@/hooks/useBackgroundJobs';
 import { api, API_BASE } from '@/utils/api';
-import type { GarbageCategory, GarbageSchedule, BackgroundJob } from '@/types';
+import type { GarbageCategory, GarbageSchedule } from '@/types';
 
 interface GarbageExtractCategory {
   name: string;
@@ -29,6 +30,7 @@ const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 export function GarbagePage() {
   const { categories, schedules, loading, searchItems, deleteCategory, deleteSchedule, deleteAll, todaySchedules, addCategory, updateCategory, addSchedule, updateSchedule, refetch } = useGarbage();
   const { toast } = useToast();
+  const { addJob, activeJobIds } = useBackgroundJobs();
   const [query, setQuery] = useState('');
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
@@ -39,29 +41,8 @@ export function GarbagePage() {
   const [extracting, setExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState<GarbageExtractResult | null>(null);
   const [registering, setRegistering] = useState(false);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!activeJobId) return;
-    const interval = setInterval(async () => {
-      try {
-        const job = await api.get<BackgroundJob>(`/api/v1/jobs/${activeJobId}`);
-        if (job.status === 'completed' && job.result) {
-          setActiveJobId(null);
-          const result = JSON.parse(job.result) as GarbageExtractResult;
-          setExtractedData(result);
-          setShowUpload(true);
-          toast('読み取り完了');
-        } else if (job.status === 'failed') {
-          setActiveJobId(null);
-          toast(job.error || '読み取りに失敗しました', 'error');
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [activeJobId, toast]);
+  const hasActiveJob = activeJobIds.length > 0;
 
   const searchResults = query ? searchItems(query) : categories;
 
@@ -99,7 +80,7 @@ export function GarbagePage() {
         </div>
       </div>
 
-      {activeJobId && (
+      {hasActiveJob && (
         <Card className="border-primary bg-primary/5">
           <div className="flex items-center gap-3">
             <Spinner size={16} />
@@ -414,7 +395,17 @@ export function GarbagePage() {
               }
               const uploaded = await uploadRes.json() as { id: string };
               const resp = await api.post<{ jobId: string }>('/api/v1/garbage/extract', { fileId: uploaded.id });
-              setActiveJobId(resp.jobId);
+              addJob(resp.jobId, {
+                onComplete: (resultJson) => {
+                  const result = JSON.parse(resultJson) as GarbageExtractResult;
+                  setExtractedData(result);
+                  setShowUpload(true);
+                  toast('読み取り完了');
+                },
+                onFail: (error) => {
+                  toast(error || '読み取りに失敗しました', 'error');
+                },
+              });
               setShowUpload(false);
               toast('バックグラウンドで読み取り中...');
             } catch {
