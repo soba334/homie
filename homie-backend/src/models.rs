@@ -1285,7 +1285,7 @@ pub struct GarbageSortResult {
 
 // ── Garbage Extract AI ──
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GarbageExtractRequest {
     pub file_id: String,
@@ -1341,6 +1341,24 @@ pub struct UpdateNotificationPreferences {
 #[serde(rename_all = "camelCase")]
 pub struct DocumentExtractResponse {
     pub chunks_extracted: usize,
+}
+
+// ── Background Jobs ──
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundJob {
+    pub id: String,
+    pub home_id: String,
+    #[serde(rename = "type")]
+    #[sqlx(rename = "type")]
+    pub job_type: String,
+    pub status: String, // "pending", "processing", "completed", "failed"
+    pub input: Option<String>,
+    pub result: Option<String>,
+    pub error: Option<String>,
+    pub created_at: String,
+    pub completed_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

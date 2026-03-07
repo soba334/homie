@@ -280,3 +280,15 @@ export interface ShiftPayDetail {
   isHoliday: boolean;
   pay: number;
 }
+
+// Background Jobs
+export interface BackgroundJob {
+  id: string;
+  type: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  input?: string;
+  result?: string;
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}

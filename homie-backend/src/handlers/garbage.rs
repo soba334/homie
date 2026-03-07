@@ -1,11 +1,15 @@
+use std::sync::Arc;
+
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use sqlx::SqlitePool;
 
 use crate::AppState;
 use crate::errors::AppError;
 use crate::models::*;
+use crate::storage::S3Storage;
 
 // ── Ollama chat API structs (local to this module) ──
 
@@ -381,19 +385,77 @@ pub async fn extract(
     State(state): State<AppState>,
     Extension(auth): Extension<AuthUser>,
     Json(req): Json<GarbageExtractRequest>,
-) -> Result<Json<GarbageExtractResult>, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     let home_id = auth
         .home_id
         .as_deref()
-        .ok_or_else(|| AppError::Forbidden("No home membership".to_string()))?;
+        .ok_or_else(|| AppError::Forbidden("No home membership".to_string()))?
+        .to_string();
 
+    // Create job
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let input_json = serde_json::to_string(&req).unwrap_or_default();
+
+    sqlx::query(
+        "INSERT INTO background_jobs (id, home_id, type, status, input) VALUES (?, ?, 'garbage_extract', 'pending', ?)",
+    )
+    .bind(&job_id)
+    .bind(&home_id)
+    .bind(&input_json)
+    .execute(&state.pool)
+    .await?;
+
+    // Spawn background task
+    let pool = state.pool.clone();
+    let storage = state.storage.clone();
+    let job_id_clone = job_id.clone();
+
+    tokio::spawn(async move {
+        // Update status to processing
+        let _ = sqlx::query("UPDATE background_jobs SET status = 'processing' WHERE id = ?")
+            .bind(&job_id_clone)
+            .execute(&pool)
+            .await;
+
+        match run_garbage_extract(&pool, &storage, &home_id, &req).await {
+            Ok(result) => {
+                let result_json = serde_json::to_string(&result).unwrap_or_default();
+                let _ = sqlx::query(
+                    "UPDATE background_jobs SET status = 'completed', result = ?, completed_at = datetime('now') WHERE id = ?",
+                )
+                .bind(&result_json)
+                .bind(&job_id_clone)
+                .execute(&pool)
+                .await;
+            }
+            Err(e) => {
+                let _ = sqlx::query(
+                    "UPDATE background_jobs SET status = 'failed', error = ?, completed_at = datetime('now') WHERE id = ?",
+                )
+                .bind(format!("{e:?}"))
+                .bind(&job_id_clone)
+                .execute(&pool)
+                .await;
+            }
+        }
+    });
+
+    Ok(Json(serde_json::json!({ "jobId": job_id })))
+}
+
+async fn run_garbage_extract(
+    pool: &SqlitePool,
+    storage: &Arc<S3Storage>,
+    home_id: &str,
+    req: &GarbageExtractRequest,
+) -> Result<GarbageExtractResult, AppError> {
     // 1. Look up file, verify home_id, validate it's image or PDF
     let file: FileRecord = sqlx::query_as(
         "SELECT id, home_id, original_name, content_type, size, s3_key, thumbnail_key, uploaded_by, uploaded_at FROM files WHERE id = ? AND home_id = ?",
     )
     .bind(&req.file_id)
     .bind(home_id)
-    .fetch_one(&state.pool)
+    .fetch_one(pool)
     .await
     .map_err(|e| match e {
         sqlx::Error::RowNotFound => AppError::NotFound,
@@ -407,7 +469,7 @@ pub async fn extract(
     }
 
     // 2. Download from S3, base64 encode
-    let file_bytes = state.storage.download(&file.s3_key).await?;
+    let file_bytes = storage.download(&file.s3_key).await?;
     let file_base64 = BASE64.encode(&file_bytes);
 
     // 3. Build Ollama request
@@ -491,7 +553,7 @@ pub async fn extract(
         ))
     })?;
 
-    Ok(Json(result))
+    Ok(result)
 }
 
 // ── AI Sort ──
