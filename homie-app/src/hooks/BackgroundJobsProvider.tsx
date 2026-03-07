@@ -2,51 +2,65 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
 import { useToast } from '@/components/ui';
 import { BackgroundJobsContext } from './backgroundJobsContext';
-import type { JobCallbacks } from './backgroundJobsContext';
+import type { CompletedJob } from './backgroundJobsContext';
 import type { BackgroundJob } from '@/types';
 
 export function BackgroundJobsProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
-  const [jobs, setJobs] = useState<Map<string, JobCallbacks>>(new Map());
+  const [activeJobs, setActiveJobs] = useState<Map<string, string>>(new Map()); // jobId -> jobType
+  const [completedJobs, setCompletedJobs] = useState<CompletedJob[]>([]);
 
-  const addJob = useCallback((jobId: string, callbacks?: JobCallbacks) => {
-    setJobs((prev) => {
+  const addJob = useCallback((jobId: string, jobType: string) => {
+    setActiveJobs((prev) => {
       const next = new Map(prev);
-      next.set(jobId, callbacks || {});
+      next.set(jobId, jobType);
       return next;
     });
   }, []);
 
+  const consumeJob = useCallback((jobId: string) => {
+    let found: CompletedJob | undefined;
+    setCompletedJobs((prev) => {
+      const idx = prev.findIndex((j) => j.id === jobId);
+      if (idx >= 0) {
+        found = prev[idx];
+        return prev.filter((_, i) => i !== idx);
+      }
+      return prev;
+    });
+    return found;
+  }, []);
+
   useEffect(() => {
-    if (jobs.size === 0) return;
+    if (activeJobs.size === 0) return;
 
     const interval = setInterval(async () => {
-      const entries = Array.from(jobs.entries());
-      for (const [jobId, callbacks] of entries) {
+      const entries = Array.from(activeJobs.entries());
+      for (const [jobId, jobType] of entries) {
         try {
           const job = await api.get<BackgroundJob>(`/api/v1/jobs/${jobId}`);
           if (job.status === 'completed') {
-            setJobs((prev) => {
+            setActiveJobs((prev) => {
               const next = new Map(prev);
               next.delete(jobId);
               return next;
             });
-            if (job.result && callbacks.onComplete) {
-              callbacks.onComplete(job.result);
-            } else {
-              toast('バックグラウンド処理が完了しました');
-            }
+            setCompletedJobs((prev) => [
+              ...prev,
+              { id: jobId, jobType, result: job.result ?? undefined, status: 'completed' },
+            ]);
+            toast('読み取り完了');
           } else if (job.status === 'failed') {
-            setJobs((prev) => {
+            setActiveJobs((prev) => {
               const next = new Map(prev);
               next.delete(jobId);
               return next;
             });
-            if (callbacks.onFail) {
-              callbacks.onFail(job.error || '処理に失敗しました');
-            } else {
-              toast(job.error || '処理に失敗しました', 'error');
-            }
+            setCompletedJobs((prev) => [
+              ...prev,
+              { id: jobId, jobType, error: job.error ?? undefined, status: 'failed' },
+            ]);
+            toast(job.error || '処理に失敗しました', 'error');
           }
         } catch {
           // ignore polling errors
@@ -55,12 +69,12 @@ export function BackgroundJobsProvider({ children }: { children: React.ReactNode
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [jobs, toast]);
+  }, [activeJobs, toast]);
 
-  const activeJobIds = Array.from(jobs.keys());
+  const activeJobIds = Array.from(activeJobs.keys());
 
   return (
-    <BackgroundJobsContext.Provider value={{ addJob, activeJobIds }}>
+    <BackgroundJobsContext.Provider value={{ addJob, activeJobIds, completedJobs, consumeJob }}>
       {children}
     </BackgroundJobsContext.Provider>
   );

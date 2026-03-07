@@ -1302,9 +1302,42 @@ pub struct GarbageExtractResult {
 pub struct GarbageExtractCategory {
     pub name: String,
     pub color: String,
+    #[serde(default)]
     pub description: String,
+    #[serde(default, deserialize_with = "deserialize_flexible_items")]
     pub items: Vec<String>,
     pub schedule: Option<GarbageExtractSchedule>,
+}
+
+/// Ollamaが items を文字列配列またはオブジェクト配列で返すことがあるため柔軟にパースする
+fn deserialize_flexible_items<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde_json::Value;
+    let values: Vec<Value> = Vec::deserialize(deserializer)?;
+    let mut result = Vec::new();
+    for v in values {
+        match v {
+            Value::String(s) => result.push(s),
+            Value::Object(obj) => {
+                // { "category": "生ごみ", "items": ["衣類"], "note": "..." }
+                if let Some(Value::String(cat)) = obj.get("category") {
+                    result.push(cat.clone());
+                }
+                if let Some(Value::Array(items)) = obj.get("items") {
+                    for item in items {
+                        if let Value::String(s) = item {
+                            result.push(s.clone());
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    result.dedup();
+    Ok(result)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

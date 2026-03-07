@@ -1,15 +1,18 @@
 import { createContext } from 'react';
 
-interface JobCallbacks {
-  onComplete?: (result: string) => void;
-  onFail?: (error: string) => void;
+export interface CompletedJob {
+  id: string;
+  jobType: string;
+  result?: string;
+  error?: string;
+  status: 'completed' | 'failed';
 }
 
-export type { JobCallbacks };
-
 export interface BackgroundJobsContextValue {
-  addJob: (jobId: string, callbacks?: JobCallbacks) => void;
+  addJob: (jobId: string, jobType: string) => void;
   activeJobIds: string[];
+  completedJobs: CompletedJob[];
+  consumeJob: (jobId: string) => CompletedJob | undefined;
 }
 
 export const BackgroundJobsContext = createContext<BackgroundJobsContextValue | null>(null);
