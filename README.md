@@ -132,21 +132,40 @@ cargo run --release
 
 ### 5. AI 機能のセットアップ（オプション）
 
-Raspberry Pi 5 (8GB) に Ollama をインストールして qwen3.5:2b を起動:
+レシートOCR・ゴミ分別AI・資料検索AIには Ollama が必要です。
+Homie 本体とは別のマシン（Raspberry Pi 5 など）で動かすことを想定しています。
 
 ```bash
 # Raspberry Pi 上で
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull qwen3.5:2b
-ollama serve  # デフォルトで :11434 で起動
 ```
 
-バックエンドの `.env` に Raspberry Pi のアドレスを設定:
+LAN 内の他のマシンからアクセスできるようにホストを開放:
+
+```bash
+sudo systemctl edit ollama
+```
+
+エディタが開くので以下を追記して保存:
+
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+```
+
+```bash
+sudo systemctl restart ollama
+```
+
+Homie バックエンドの `.env` に Raspberry Pi のアドレスを設定:
 
 ```env
 OLLAMA_URL=http://<ラズパイのIP>:11434
 OLLAMA_MODEL=qwen3.5:2b
 ```
+
+> 同じマシンで動かす場合は `OLLAMA_HOST` の変更は不要です（`http://localhost:11434` のまま使えます）。
 
 ### 6. スマホからアクセスする場合（オプション）
 
