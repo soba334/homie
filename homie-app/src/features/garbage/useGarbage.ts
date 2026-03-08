@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '@/utils/api';
 import type { GarbageCategory, GarbageSchedule } from '@/types';
 
+/** ひらがな→カタカナ統一 + lowercase で表記揺れを吸収 */
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[\u3041-\u3096]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) + 0x60),
+  );
+}
+
 export function useGarbage() {
   const [categories, setCategories] = useState<GarbageCategory[]>([]);
   const [schedules, setSchedules] = useState<GarbageSchedule[]>([]);
@@ -82,9 +89,9 @@ export function useGarbage() {
 
   const searchItems = useCallback((query: string) => {
     if (!query.trim()) return [];
-    const q = query.toLowerCase();
+    const q = normalize(query);
     return categories.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.items.some((item) => item.toLowerCase().includes(q)),
+      (c) => normalize(c.name).includes(q) || c.items.some((item) => normalize(item).includes(q)),
     );
   }, [categories]);
 

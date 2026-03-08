@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
-import { Trash2, Plus, Pencil, HelpCircle } from 'lucide-react';
-import { Card, Button, SearchInput, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
+import { useState, useEffect, useRef } from 'react';
+import { Trash2, Plus, Pencil, Search, Camera, Sparkles, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Card, Button, Modal, FileUpload, Spinner, useToast } from '@/components/ui';
 import { useGarbage } from './useGarbage';
 import { GarbageCategoryForm } from './GarbageCategoryForm';
 import { GarbageScheduleForm } from './GarbageScheduleForm';
-import { GarbageSortModal } from './GarbageSortModal';
 import { useBackgroundJobs } from '@/hooks/useBackgroundJobs';
 import { api, API_BASE } from '@/utils/api';
 import type { GarbageCategory, GarbageSchedule } from '@/types';
+
+interface GarbageSortResult {
+  category: string | null;
+  explanation: string;
+  tips: string | null;
+}
 
 interface GarbageExtractCategory {
   name: string;
@@ -37,10 +43,14 @@ export function GarbagePage() {
   const [showUpload, setShowUpload] = useState(false);
   const [editingCategory, setEditingCategory] = useState<GarbageCategory | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<GarbageSchedule | null>(null);
-  const [showSortModal, setShowSortModal] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractedData, setExtractedData] = useState<GarbageExtractResult | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [sortLoading, setSortLoading] = useState(false);
+  const [sortResult, setSortResult] = useState<GarbageSortResult | null>(null);
+  const [sortImage, setSortImage] = useState<File | null>(null);
+  const [sortImagePreview, setSortImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasActiveJob = activeJobIds.length > 0;
 
@@ -57,6 +67,61 @@ export function GarbagePage() {
   }, [completedJobs, consumeJob]);
 
   const searchResults = query ? searchItems(query) : categories;
+  const noLocalResults = query.trim() !== '' && searchResults.length === 0;
+
+  const handleAskAI = async () => {
+    if (!query.trim() && !sortImage) return;
+    setSortLoading(true);
+    setSortResult(null);
+    try {
+      let fileId: string | undefined;
+      if (sortImage) {
+        const formData = new FormData();
+        formData.append('file', sortImage);
+        const uploadRes = await fetch(`${API_BASE}/api/v1/files`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error('File upload failed');
+        const uploaded = (await uploadRes.json()) as { id: string };
+        fileId = uploaded.id;
+      }
+      const data = await api.post<GarbageSortResult>('/api/v1/garbage/ask', {
+        query: query.trim(),
+        fileId,
+      });
+      setSortResult(data);
+    } catch {
+      setSortResult({ category: null, explanation: 'エラーが発生しました。もう一度お試しください。', tips: null });
+    } finally {
+      setSortLoading(false);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSortImage(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setSortImagePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSortImage(null);
+    setSortImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const matchedCategory = sortResult?.category
+    ? categories.find((c) => c.name === sortResult.category || c.name.toLowerCase() === sortResult.category!.toLowerCase())
+    : null;
+
+  const matchedSchedules = matchedCategory
+    ? schedules.filter((s) => s.categoryId === matchedCategory.id)
+    : [];
 
   const todayCategories = todaySchedules
     .map((s) => categories.find((c) => c.id === s.categoryId))
@@ -78,10 +143,6 @@ export function GarbagePage() {
           ゴミ出し管理
         </h1>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setShowSortModal(true)}>
-            <HelpCircle size={16} className="inline mr-1" />
-            何ゴミ？
-          </Button>
           <Button size="sm" variant="secondary" onClick={() => setShowUpload(true)}>
             画像/PDFから登録
           </Button>
@@ -118,11 +179,129 @@ export function GarbagePage() {
         </Card>
       )}
 
-      <SearchInput
-        placeholder="分別方法を検索（例: ペットボトル）"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      {/* Search + AI ask */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <input
+              type="search"
+              className="w-full pl-10 pr-10 py-2 rounded-lg border border-outline bg-surface text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="何ゴミ？検索（例: ペットボトル）"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setSortResult(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && query.trim()) {
+                  e.preventDefault();
+                  handleAskAI();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-surface-container cursor-pointer text-on-surface-variant"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Camera size={18} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+          </div>
+          <Button
+            size="md"
+            onClick={handleAskAI}
+            disabled={sortLoading || (!query.trim() && !sortImage)}
+          >
+            <Sparkles size={16} className="inline mr-1" />
+            AIに聞く
+          </Button>
+        </div>
+
+        {sortImagePreview && (
+          <div className="relative inline-block">
+            <img src={sortImagePreview} alt="選択した画像" className="h-20 rounded-lg object-cover" />
+            <button
+              type="button"
+              className="absolute -top-2 -right-2 bg-surface rounded-full shadow p-0.5 cursor-pointer hover:bg-surface-container"
+              onClick={removeImage}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {sortLoading && (
+          <div className="flex items-center gap-3 py-4 justify-center">
+            <Spinner />
+            <p className="text-sm text-on-surface-variant">分別を調べています...</p>
+          </div>
+        )}
+
+        <AnimatePresence>
+          {sortResult && !sortLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.25 }}
+            >
+              {matchedCategory ? (
+                <Card className="border-l-4" style={{ borderLeftColor: matchedCategory.color }}>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full inline-block shrink-0" style={{ backgroundColor: matchedCategory.color }} />
+                      <span className="font-bold text-lg">{matchedCategory.name}</span>
+                    </div>
+                    <p className="text-sm text-on-surface-variant">{sortResult.explanation}</p>
+                    {sortResult.tips && (
+                      <div className="bg-surface-container rounded-lg px-3 py-2">
+                        <p className="text-xs font-medium mb-0.5">ポイント</p>
+                        <p className="text-sm text-on-surface-variant">{sortResult.tips}</p>
+                      </div>
+                    )}
+                    {matchedSchedules.length > 0 && (
+                      <div className="flex items-center gap-2 pt-1 border-t border-outline/30">
+                        <span className="text-xs text-on-surface-variant">収集日:</span>
+                        <span className="text-sm font-medium">
+                          {matchedSchedules[0].dayOfWeek.map((d) => DAY_NAMES[d]).join('・')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ) : (
+                <Card>
+                  <div className="space-y-3">
+                    {sortResult.category && <p className="font-bold text-lg">{sortResult.category}</p>}
+                    <p className="text-sm text-on-surface-variant">{sortResult.explanation}</p>
+                    {sortResult.tips && (
+                      <div className="bg-surface-container rounded-lg px-3 py-2">
+                        <p className="text-xs font-medium mb-0.5">ポイント</p>
+                        <p className="text-sm text-on-surface-variant">{sortResult.tips}</p>
+                      </div>
+                    )}
+                    {!sortResult.category && (
+                      <p className="text-xs text-on-surface-variant">登録されたカテゴリに該当するものが見つかりませんでした</p>
+                    )}
+                  </div>
+                </Card>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {noLocalResults && !sortResult && !sortLoading && (
+          <p className="text-sm text-on-surface-variant text-center py-2">
+            登録データにヒットしませんでした。「AIに聞く」で調べてみましょう。
+          </p>
+        )}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {searchResults.map((cat) => {
@@ -424,12 +603,6 @@ export function GarbagePage() {
         )}
       </Modal>
 
-      <GarbageSortModal
-        open={showSortModal}
-        onClose={() => setShowSortModal(false)}
-        categories={categories}
-        schedules={schedules}
-      />
     </div>
   );
 }
