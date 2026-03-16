@@ -29,7 +29,7 @@ export function useDocuments() {
       api.getWithSchema(buildPath(searchQuery || undefined), DocumentListSchema),
   });
 
-  const documents = documentsQuery.data ?? [];
+  const documents = useMemo(() => documentsQuery.data ?? [], [documentsQuery.data]);
   const loading = documentsQuery.isLoading;
 
   const addDocumentMutation = useMutation({

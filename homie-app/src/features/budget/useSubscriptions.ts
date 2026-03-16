@@ -49,7 +49,7 @@ export function useSubscriptions() {
     },
   });
 
-  const subscriptions = subscriptionsQuery.data ?? [];
+  const subscriptions = useMemo(() => subscriptionsQuery.data ?? [], [subscriptionsQuery.data]);
   const loading = subscriptionsQuery.isLoading;
 
   const monthlyTotal = useMemo(

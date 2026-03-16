@@ -30,8 +30,8 @@ export function useGarbage() {
     queryFn: () => api.getWithSchema('/api/v1/garbage/schedules', GarbageScheduleListSchema),
   });
 
-  const categories = categoriesQuery.data ?? [];
-  const schedules = schedulesQuery.data ?? [];
+  const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
+  const schedules = useMemo(() => schedulesQuery.data ?? [], [schedulesQuery.data]);
   const loading = categoriesQuery.isLoading || schedulesQuery.isLoading;
 
   const addCategoryMutation = useMutation({

@@ -7,7 +7,6 @@ import {
   AccountTransactionListSchema,
   AccountTransactionSchema,
 } from '@/lib/schemas';
-import type { AccountWithBalance } from '@/lib/schemas';
 
 export function useAccounts() {
   const queryClient = useQueryClient();
