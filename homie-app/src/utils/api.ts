@@ -68,6 +68,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+import type { ZodType } from 'zod';
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -77,6 +79,32 @@ export const api = {
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   delete: (path: string) => request<void>(path, { method: 'DELETE' }),
+
+  getWithSchema: async <T>(path: string, schema: ZodType<T>): Promise<T> => {
+    const raw = await request<unknown>(path);
+    return schema.parse(raw);
+  },
+  postWithSchema: async <T>(path: string, schema: ZodType<T>, body?: unknown): Promise<T> => {
+    const raw = await request<unknown>(path, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return schema.parse(raw);
+  },
+  putWithSchema: async <T>(path: string, schema: ZodType<T>, body: unknown): Promise<T> => {
+    const raw = await request<unknown>(path, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    return schema.parse(raw);
+  },
+  patchWithSchema: async <T>(path: string, schema: ZodType<T>, body?: unknown): Promise<T> => {
+    const raw = await request<unknown>(path, {
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return schema.parse(raw);
+  },
 };
 
 export { API_BASE };
