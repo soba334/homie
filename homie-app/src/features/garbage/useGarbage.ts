@@ -1,5 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 import { api } from '@/utils/api';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  GarbageCategoryListSchema,
+  GarbageCategorySchema,
+  GarbageScheduleListSchema,
+  GarbageScheduleSchema,
+} from '@/lib/schemas';
 import type { GarbageCategory, GarbageSchedule } from '@/types';
 
 /** ひらがな→カタカナ統一 + lowercase で表記揺れを吸収 */
@@ -10,33 +18,83 @@ function normalize(s: string): string {
 }
 
 export function useGarbage() {
-  const [categories, setCategories] = useState<GarbageCategory[]>([]);
-  const [schedules, setSchedules] = useState<GarbageSchedule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchCategories = useCallback(async () => {
-    const data = await api.get<GarbageCategory[]>('/api/v1/garbage/categories');
-    setCategories(data);
-  }, []);
+  const categoriesQuery = useQuery({
+    queryKey: queryKeys.garbage.categories(),
+    queryFn: () => api.getWithSchema('/api/v1/garbage/categories', GarbageCategoryListSchema),
+  });
 
-  const fetchSchedules = useCallback(async () => {
-    const data = await api.get<GarbageSchedule[]>('/api/v1/garbage/schedules');
-    setSchedules(data);
-  }, []);
+  const schedulesQuery = useQuery({
+    queryKey: queryKeys.garbage.schedules(),
+    queryFn: () => api.getWithSchema('/api/v1/garbage/schedules', GarbageScheduleListSchema),
+  });
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([fetchCategories(), fetchSchedules()]);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [fetchCategories, fetchSchedules]);
+  const categories = categoriesQuery.data ?? [];
+  const schedules = schedulesQuery.data ?? [];
+  const loading = categoriesQuery.isLoading || schedulesQuery.isLoading;
+
+  const addCategoryMutation = useMutation({
+    mutationFn: (category: {
+      name: string;
+      color: string;
+      description: string;
+      items: string[];
+    }) => api.postWithSchema('/api/v1/garbage/categories', GarbageCategorySchema, category),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<GarbageCategory> }) =>
+      api.putWithSchema(`/api/v1/garbage/categories/${id}`, GarbageCategorySchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/garbage/categories/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const addScheduleMutation = useMutation({
+    mutationFn: (schedule: {
+      categoryId: string;
+      dayOfWeek: number[];
+      weekOfMonth?: number[];
+      location?: string;
+      note?: string;
+    }) => api.postWithSchema('/api/v1/garbage/schedules', GarbageScheduleSchema, schedule),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<GarbageSchedule> }) =>
+      api.putWithSchema(`/api/v1/garbage/schedules/${id}`, GarbageScheduleSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/garbage/schedules/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: () => api.delete('/api/v1/garbage/all'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.all });
+    },
+  });
 
   const addCategory = useCallback(async (category: {
     name: string;
@@ -44,21 +102,16 @@ export function useGarbage() {
     description: string;
     items: string[];
   }) => {
-    const created = await api.post<GarbageCategory>('/api/v1/garbage/categories', category);
-    setCategories((prev) => [...prev, created]);
-    return created;
-  }, []);
+    return addCategoryMutation.mutateAsync(category);
+  }, [addCategoryMutation]);
 
   const updateCategory = useCallback(async (id: string, updates: Partial<GarbageCategory>) => {
-    const updated = await api.put<GarbageCategory>(`/api/v1/garbage/categories/${id}`, updates);
-    setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
-  }, []);
+    await updateCategoryMutation.mutateAsync({ id, updates });
+  }, [updateCategoryMutation]);
 
   const deleteCategory = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/garbage/categories/${id}`);
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-    setSchedules((prev) => prev.filter((s) => s.categoryId !== id));
-  }, []);
+    await deleteCategoryMutation.mutateAsync(id);
+  }, [deleteCategoryMutation]);
 
   const addSchedule = useCallback(async (schedule: {
     categoryId: string;
@@ -67,25 +120,20 @@ export function useGarbage() {
     location?: string;
     note?: string;
   }) => {
-    const created = await api.post<GarbageSchedule>('/api/v1/garbage/schedules', schedule);
-    setSchedules((prev) => [...prev, created]);
-  }, []);
+    await addScheduleMutation.mutateAsync(schedule);
+  }, [addScheduleMutation]);
 
   const updateSchedule = useCallback(async (id: string, updates: Partial<GarbageSchedule>) => {
-    const updated = await api.put<GarbageSchedule>(`/api/v1/garbage/schedules/${id}`, updates);
-    setSchedules((prev) => prev.map((s) => (s.id === id ? updated : s)));
-  }, []);
+    await updateScheduleMutation.mutateAsync({ id, updates });
+  }, [updateScheduleMutation]);
 
   const deleteSchedule = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/garbage/schedules/${id}`);
-    setSchedules((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+    await deleteScheduleMutation.mutateAsync(id);
+  }, [deleteScheduleMutation]);
 
   const deleteAll = useCallback(async () => {
-    await api.delete('/api/v1/garbage/all');
-    setCategories([]);
-    setSchedules([]);
-  }, []);
+    await deleteAllMutation.mutateAsync();
+  }, [deleteAllMutation]);
 
   const searchItems = useCallback((query: string) => {
     if (!query.trim()) return [];
@@ -117,8 +165,11 @@ export function useGarbage() {
   }, [getSchedulesForDate]);
 
   const refetch = useCallback(async () => {
-    await Promise.all([fetchCategories(), fetchSchedules()]);
-  }, [fetchCategories, fetchSchedules]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.categories() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.garbage.schedules() }),
+    ]);
+  }, [queryClient]);
 
   return {
     categories,

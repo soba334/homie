@@ -1,98 +1,121 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
-import type { AccountWithBalance, AccountTransaction } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  AccountWithBalanceListSchema,
+  AccountWithBalanceSchema,
+  AccountTransactionListSchema,
+  AccountTransactionSchema,
+} from '@/lib/schemas';
+import type { AccountWithBalance, AccountTransaction } from '@/lib/schemas';
 
 export function useAccounts() {
-  const [accounts, setAccounts] = useState<AccountWithBalance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchAccounts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<AccountWithBalance[]>('/api/v1/accounts');
-      setAccounts(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const accountsQuery = useQuery({
+    queryKey: queryKeys.accounts.list(),
+    queryFn: () => api.getWithSchema('/api/v1/accounts', AccountWithBalanceListSchema),
+  });
 
-  useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+  const addAccountMutation = useMutation({
+    mutationFn: (input: {
+      name: string;
+      type: string;
+      initialBalance?: number;
+      color?: string;
+      billingDate?: number;
+      paymentDate?: number;
+      paymentAccountId?: string;
+      note?: string;
+      userId?: string;
+    }) => api.postWithSchema('/api/v1/accounts', AccountWithBalanceSchema, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
 
-  const addAccount = useCallback(async (input: {
-    name: string;
-    type: string;
-    initialBalance?: number;
-    color?: string;
-    billingDate?: number;
-    paymentDate?: number;
-    paymentAccountId?: string;
-    note?: string;
-    userId?: string;
-  }) => {
-    const created = await api.post<AccountWithBalance>('/api/v1/accounts', input);
-    setAccounts((prev) => [...prev, created]);
-    return created;
-  }, []);
+  const updateAccountMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Record<string, unknown> }) =>
+      api.putWithSchema(`/api/v1/accounts/${id}`, AccountWithBalanceSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
 
-  const updateAccount = useCallback(async (id: string, updates: Record<string, unknown>) => {
-    const updated = await api.put<AccountWithBalance>(`/api/v1/accounts/${id}`, updates);
-    setAccounts((prev) => prev.map((a) => (a.id === id ? updated : a)));
-    return updated;
-  }, []);
+  const deleteAccountMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/accounts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
 
-  const deleteAccount = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/accounts/${id}`);
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-  }, []);
-
+  const accounts = accountsQuery.data ?? [];
+  const loading = accountsQuery.isLoading;
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
-  return { accounts, loading, totalBalance, addAccount, updateAccount, deleteAccount, refetch: fetchAccounts };
+  return {
+    accounts,
+    loading,
+    totalBalance,
+    addAccount: (input: Parameters<typeof addAccountMutation.mutateAsync>[0]) =>
+      addAccountMutation.mutateAsync(input),
+    updateAccount: (id: string, updates: Record<string, unknown>) =>
+      updateAccountMutation.mutateAsync({ id, updates }),
+    deleteAccount: (id: string) => deleteAccountMutation.mutateAsync(id),
+    refetch: () => accountsQuery.refetch(),
+  };
 }
 
 export function useAccountTransactions(accountId: string, yearMonth?: string) {
-  const [transactions, setTransactions] = useState<AccountTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchTransactions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = yearMonth ? `?year_month=${yearMonth}` : '';
-      const data = await api.get<AccountTransaction[]>(`/api/v1/accounts/${accountId}/transactions${params}`);
-      setTransactions(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [accountId, yearMonth]);
+  const params = yearMonth ? `?year_month=${yearMonth}` : '';
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+  const transactionsQuery = useQuery({
+    queryKey: queryKeys.accounts.transactions(accountId, yearMonth),
+    queryFn: () =>
+      api.getWithSchema(
+        `/api/v1/accounts/${accountId}/transactions${params}`,
+        AccountTransactionListSchema,
+      ),
+  });
 
-  const addTransaction = useCallback(async (input: {
-    amount: number;
-    type: string;
-    category?: string;
-    description?: string;
-    date: string;
-    transferToAccountId?: string;
-    budgetEntryId?: string;
-  }) => {
-    const created = await api.post<AccountTransaction>(`/api/v1/accounts/${accountId}/transactions`, input);
-    setTransactions((prev) => [created, ...prev]);
-    return created;
-  }, [accountId]);
+  const addTransactionMutation = useMutation({
+    mutationFn: (input: {
+      amount: number;
+      type: string;
+      category?: string;
+      description?: string;
+      date: string;
+      transferToAccountId?: string;
+      budgetEntryId?: string;
+    }) =>
+      api.postWithSchema(
+        `/api/v1/accounts/${accountId}/transactions`,
+        AccountTransactionSchema,
+        input,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
 
-  const deleteTransaction = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/accounts/transactions/${id}`);
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  const deleteTransactionMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/accounts/transactions/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.all });
+    },
+  });
 
-  return { transactions, loading, addTransaction, deleteTransaction, refetch: fetchTransactions };
+  const transactions = transactionsQuery.data ?? [];
+  const loading = transactionsQuery.isLoading;
+
+  return {
+    transactions,
+    loading,
+    addTransaction: (input: Parameters<typeof addTransactionMutation.mutateAsync>[0]) =>
+      addTransactionMutation.mutateAsync(input),
+    deleteTransaction: (id: string) => deleteTransactionMutation.mutateAsync(id),
+    refetch: () => transactionsQuery.refetch(),
+  };
 }

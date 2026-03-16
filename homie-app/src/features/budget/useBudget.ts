@@ -1,70 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
-import type { BudgetEntry, BudgetSummary } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  BudgetEntryListSchema,
+  BudgetSummarySchema,
+  BudgetEntrySchema,
+} from '@/lib/schemas';
+import type { BudgetEntry } from '@/lib/schemas';
 
 export function useBudget(yearMonth?: string) {
-  const [entries, setEntries] = useState<BudgetEntry[]>([]);
-  const [summary, setSummary] = useState<BudgetSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchEntries = useCallback(async () => {
-    const params = yearMonth ? `?year_month=${yearMonth}` : '';
-    const data = await api.get<BudgetEntry[]>(`/api/v1/budget/entries${params}`);
-    setEntries(data);
-  }, [yearMonth]);
+  const params = yearMonth ? `?year_month=${yearMonth}` : '';
 
-  const fetchSummary = useCallback(async () => {
-    const params = yearMonth ? `?year_month=${yearMonth}` : '';
-    const data = await api.get<BudgetSummary>(`/api/v1/budget/summary${params}`);
-    setSummary(data);
-  }, [yearMonth]);
+  const entriesQuery = useQuery({
+    queryKey: queryKeys.budget.entries(yearMonth),
+    queryFn: () => api.getWithSchema(`/api/v1/budget/entries${params}`, BudgetEntryListSchema),
+  });
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        await Promise.all([fetchEntries(), fetchSummary()]);
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [fetchEntries, fetchSummary]);
+  const summaryQuery = useQuery({
+    queryKey: queryKeys.budget.summary(yearMonth),
+    queryFn: () => api.getWithSchema(`/api/v1/budget/summary${params}`, BudgetSummarySchema),
+  });
 
-  const addEntry = useCallback(async (entry: {
-    date: string;
-    amount: number;
-    category: string;
-    description: string;
-    paidBy: string;
-    receiptImageUrl?: string;
-    accountId?: string;
-  }) => {
-    const created = await api.post<BudgetEntry>('/api/v1/budget/entries', entry);
-    setEntries((prev) => [created, ...prev]);
-    fetchSummary();
-  }, [fetchSummary]);
+  const addEntryMutation = useMutation({
+    mutationFn: (entry: {
+      date: string;
+      amount: number;
+      category: string;
+      description: string;
+      paidBy: string;
+      receiptImageUrl?: string;
+      accountId?: string;
+    }) => api.postWithSchema('/api/v1/budget/entries', BudgetEntrySchema, entry),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.budget.all });
+    },
+  });
 
-  const updateEntry = useCallback(async (id: string, updates: Partial<BudgetEntry>) => {
-    const updated = await api.put<BudgetEntry>(`/api/v1/budget/entries/${id}`, updates);
-    setEntries((prev) => prev.map((e) => (e.id === id ? updated : e)));
-    fetchSummary();
-  }, [fetchSummary]);
+  const updateEntryMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<BudgetEntry> }) =>
+      api.putWithSchema(`/api/v1/budget/entries/${id}`, BudgetEntrySchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.budget.all });
+    },
+  });
 
-  const deleteEntry = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/budget/entries/${id}`);
-    setEntries((prev) => prev.filter((e) => e.id !== id));
-    fetchSummary();
-  }, [fetchSummary]);
+  const deleteEntryMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/budget/entries/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.budget.all });
+    },
+  });
+
+  const entries = entriesQuery.data ?? [];
+  const summary = summaryQuery.data ?? null;
+  const loading = entriesQuery.isLoading || summaryQuery.isLoading;
 
   return {
     entries,
     loading,
-    addEntry,
-    updateEntry,
-    deleteEntry,
+    addEntry: (entry: Parameters<typeof addEntryMutation.mutateAsync>[0]) =>
+      addEntryMutation.mutateAsync(entry),
+    updateEntry: (id: string, updates: Partial<BudgetEntry>) =>
+      updateEntryMutation.mutateAsync({ id, updates }),
+    deleteEntry: (id: string) => deleteEntryMutation.mutateAsync(id),
     monthlyTotal: summary?.monthlyTotal ?? 0,
     monthlyByPerson: summary?.byPerson ?? {},
     categorySummary: summary?.byCategory ?? {},

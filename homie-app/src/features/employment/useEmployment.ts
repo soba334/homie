@@ -1,140 +1,181 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { api } from '@/utils/api';
-import type { Employment, Shift, SalaryRecord, SalaryPrediction } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  EmploymentListSchema,
+  EmploymentSchema,
+  ShiftListSchema,
+  ShiftSchema,
+  SalaryRecordListSchema,
+  SalaryRecordSchema,
+  SalaryPredictionSchema,
+} from '@/lib/schemas';
+import type { SalaryPrediction } from '@/lib/schemas';
 
 export function useEmployments() {
-  const [employments, setEmployments] = useState<Employment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchEmployments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<Employment[]>('/api/v1/employments');
-      setEmployments(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const employmentsQuery = useQuery({
+    queryKey: queryKeys.employment.list(),
+    queryFn: () => api.getWithSchema('/api/v1/employments', EmploymentListSchema),
+  });
 
-  useEffect(() => {
-    fetchEmployments();
-  }, [fetchEmployments]);
+  const addEmploymentMutation = useMutation({
+    mutationFn: (input: Record<string, unknown>) =>
+      api.postWithSchema('/api/v1/employments', EmploymentSchema, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const addEmployment = useCallback(async (input: Record<string, unknown>) => {
-    const created = await api.post<Employment>('/api/v1/employments', input);
-    setEmployments((prev) => [...prev, created]);
-    return created;
-  }, []);
+  const updateEmploymentMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Record<string, unknown> }) =>
+      api.putWithSchema(`/api/v1/employments/${id}`, EmploymentSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const updateEmployment = useCallback(async (id: string, updates: Record<string, unknown>) => {
-    const updated = await api.put<Employment>(`/api/v1/employments/${id}`, updates);
-    setEmployments((prev) => prev.map((e) => (e.id === id ? updated : e)));
-    return updated;
-  }, []);
+  const deleteEmploymentMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/employments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const deleteEmployment = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/employments/${id}`);
-    setEmployments((prev) => prev.filter((e) => e.id !== id));
-  }, []);
+  const employments = employmentsQuery.data ?? [];
+  const loading = employmentsQuery.isLoading;
 
-  return { employments, loading, addEmployment, updateEmployment, deleteEmployment };
+  return {
+    employments,
+    loading,
+    addEmployment: (input: Record<string, unknown>) =>
+      addEmploymentMutation.mutateAsync(input),
+    updateEmployment: (id: string, updates: Record<string, unknown>) =>
+      updateEmploymentMutation.mutateAsync({ id, updates }),
+    deleteEmployment: (id: string) => deleteEmploymentMutation.mutateAsync(id),
+  };
 }
 
 export function useShifts(yearMonth?: string, userId?: string) {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchShifts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (yearMonth) params.set('year_month', yearMonth);
-      if (userId) params.set('user_id', userId);
-      const qs = params.toString();
-      const data = await api.get<Shift[]>(`/api/v1/shifts${qs ? `?${qs}` : ''}`);
-      setShifts(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [yearMonth, userId]);
+  const params = new URLSearchParams();
+  if (yearMonth) params.set('year_month', yearMonth);
+  if (userId) params.set('user_id', userId);
+  const qs = params.toString();
 
-  useEffect(() => {
-    fetchShifts();
-  }, [fetchShifts]);
+  const shiftsQuery = useQuery({
+    queryKey: queryKeys.employment.shifts(yearMonth, userId),
+    queryFn: () =>
+      api.getWithSchema(`/api/v1/shifts${qs ? `?${qs}` : ''}`, ShiftListSchema),
+  });
 
-  const addShift = useCallback(async (input: {
-    employmentId: string;
-    date: string;
-    startTime: string;
-    endTime: string;
-    breakMinutes?: number;
-    isHoliday?: boolean;
-    note?: string;
-  }) => {
-    const created = await api.post<Shift>('/api/v1/shifts', input);
-    setShifts((prev) => [...prev, created].sort((a, b) => a.date.localeCompare(b.date)));
-    return created;
-  }, []);
+  const addShiftMutation = useMutation({
+    mutationFn: (input: {
+      employmentId: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      breakMinutes?: number;
+      isHoliday?: boolean;
+      note?: string;
+    }) => api.postWithSchema('/api/v1/shifts', ShiftSchema, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const updateShift = useCallback(async (id: string, updates: Record<string, unknown>) => {
-    const updated = await api.put<Shift>(`/api/v1/shifts/${id}`, updates);
-    setShifts((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    return updated;
-  }, []);
+  const updateShiftMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Record<string, unknown> }) =>
+      api.putWithSchema(`/api/v1/shifts/${id}`, ShiftSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const deleteShift = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/shifts/${id}`);
-    setShifts((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const deleteShiftMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/shifts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  return { shifts, loading, addShift, updateShift, deleteShift, refetch: fetchShifts };
+  const shifts = shiftsQuery.data ?? [];
+  const loading = shiftsQuery.isLoading;
+
+  return {
+    shifts,
+    loading,
+    addShift: (input: Parameters<typeof addShiftMutation.mutateAsync>[0]) =>
+      addShiftMutation.mutateAsync(input),
+    updateShift: (id: string, updates: Record<string, unknown>) =>
+      updateShiftMutation.mutateAsync({ id, updates }),
+    deleteShift: (id: string) => deleteShiftMutation.mutateAsync(id),
+    refetch: () => shiftsQuery.refetch(),
+  };
 }
 
 export function useSalary(yearMonth?: string) {
-  const [records, setRecords] = useState<SalaryRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchRecords = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = yearMonth ? `?year_month=${yearMonth}` : '';
-      const data = await api.get<SalaryRecord[]>(`/api/v1/salary/records${params}`);
-      setRecords(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [yearMonth]);
+  const params = yearMonth ? `?year_month=${yearMonth}` : '';
 
-  useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
+  const recordsQuery = useQuery({
+    queryKey: queryKeys.employment.salary(yearMonth),
+    queryFn: () =>
+      api.getWithSchema(`/api/v1/salary/records${params}`, SalaryRecordListSchema),
+  });
 
-  const predict = useCallback(async (employmentId: string, ym: string) => {
-    return api.get<SalaryPrediction>(`/api/v1/salary/predict?year_month=${ym}&employment_id=${employmentId}`);
-  }, []);
+  const predictMutation = useMutation({
+    mutationFn: ({ employmentId, ym }: { employmentId: string; ym: string }) =>
+      api.getWithSchema(
+        `/api/v1/salary/predict?year_month=${ym}&employment_id=${employmentId}`,
+        SalaryPredictionSchema,
+      ),
+  });
 
-  const addRecord = useCallback(async (input: Record<string, unknown>) => {
-    const created = await api.post<SalaryRecord>('/api/v1/salary/records', input);
-    setRecords((prev) => [created, ...prev]);
-    return created;
-  }, []);
+  const predict = useCallback(
+    (employmentId: string, ym: string): Promise<SalaryPrediction> =>
+      predictMutation.mutateAsync({ employmentId, ym }),
+    [predictMutation],
+  );
 
-  const updateRecord = useCallback(async (id: string, updates: Record<string, unknown>) => {
-    const updated = await api.put<SalaryRecord>(`/api/v1/salary/records/${id}`, updates);
-    setRecords((prev) => prev.map((r) => (r.id === id ? updated : r)));
-    return updated;
-  }, []);
+  const addRecordMutation = useMutation({
+    mutationFn: (input: Record<string, unknown>) =>
+      api.postWithSchema('/api/v1/salary/records', SalaryRecordSchema, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  const deleteRecord = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/salary/records/${id}`);
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-  }, []);
+  const updateRecordMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Record<string, unknown> }) =>
+      api.putWithSchema(`/api/v1/salary/records/${id}`, SalaryRecordSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
 
-  return { records, loading, predict, addRecord, updateRecord, deleteRecord };
+  const deleteRecordMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/salary/records/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.employment.all });
+    },
+  });
+
+  const records = recordsQuery.data ?? [];
+  const loading = recordsQuery.isLoading;
+
+  return {
+    records,
+    loading,
+    predict,
+    addRecord: (input: Record<string, unknown>) =>
+      addRecordMutation.mutateAsync(input),
+    updateRecord: (id: string, updates: Record<string, unknown>) =>
+      updateRecordMutation.mutateAsync({ id, updates }),
+    deleteRecord: (id: string) => deleteRecordMutation.mutateAsync(id),
+  };
 }

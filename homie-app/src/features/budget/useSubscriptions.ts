@@ -1,70 +1,78 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { api } from '@/utils/api';
-import type { Subscription } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  SubscriptionListSchema,
+  SubscriptionSchema,
+} from '@/lib/schemas';
+import type { Subscription } from '@/lib/schemas';
 
 export function useSubscriptions() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchSubscriptions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<Subscription[]>('/api/v1/subscriptions');
-      setSubscriptions(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const subscriptionsQuery = useQuery({
+    queryKey: queryKeys.subscriptions.list(),
+    queryFn: () => api.getWithSchema('/api/v1/subscriptions', SubscriptionListSchema),
+  });
 
-  useEffect(() => {
-    fetchSubscriptions();
-  }, [fetchSubscriptions]);
+  const addSubscriptionMutation = useMutation({
+    mutationFn: (input: {
+      name: string;
+      amount: number;
+      category: string;
+      paidBy: string;
+      accountId?: string;
+      billingCycle: string;
+      billingDay: number;
+      nextBillingDate: string;
+      note?: string;
+      syncToCalendar?: boolean;
+    }) => api.postWithSchema('/api/v1/subscriptions', SubscriptionSchema, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+    },
+  });
 
-  const addSubscription = useCallback(async (input: {
-    name: string;
-    amount: number;
-    category: string;
-    paidBy: string;
-    accountId?: string;
-    billingCycle: string;
-    billingDay: number;
-    nextBillingDate: string;
-    note?: string;
-    syncToCalendar?: boolean;
-  }) => {
-    const created = await api.post<Subscription>('/api/v1/subscriptions', input);
-    setSubscriptions((prev) => [...prev, created]);
-    return created;
-  }, []);
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Subscription> }) =>
+      api.putWithSchema(`/api/v1/subscriptions/${id}`, SubscriptionSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+    },
+  });
 
-  const updateSubscription = useCallback(async (id: string, updates: Partial<Subscription>) => {
-    const updated = await api.put<Subscription>(`/api/v1/subscriptions/${id}`, updates);
-    setSubscriptions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    return updated;
-  }, []);
+  const deleteSubscriptionMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/subscriptions/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+    },
+  });
 
-  const deleteSubscription = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/subscriptions/${id}`);
-    setSubscriptions((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const subscriptions = subscriptionsQuery.data ?? [];
+  const loading = subscriptionsQuery.isLoading;
 
-  const monthlyTotal = subscriptions
-    .filter((s) => s.isActive)
-    .reduce((sum, s) => {
-      if (s.billingCycle === 'yearly') return sum + s.amount / 12;
-      if (s.billingCycle === 'weekly') return sum + s.amount * 4.33;
-      return sum + s.amount;
-    }, 0);
+  const monthlyTotal = useMemo(
+    () =>
+      subscriptions
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => {
+          if (s.billingCycle === 'yearly') return sum + s.amount / 12;
+          if (s.billingCycle === 'weekly') return sum + s.amount * 4.33;
+          return sum + s.amount;
+        }, 0),
+    [subscriptions],
+  );
 
   return {
     subscriptions,
     loading,
     monthlyTotal,
-    addSubscription,
-    updateSubscription,
-    deleteSubscription,
-    refetch: fetchSubscriptions,
+    addSubscription: (input: Parameters<typeof addSubscriptionMutation.mutateAsync>[0]) =>
+      addSubscriptionMutation.mutateAsync(input),
+    updateSubscription: (id: string, updates: Partial<Subscription>) =>
+      updateSubscriptionMutation.mutateAsync({ id, updates }),
+    deleteSubscription: (id: string) => deleteSubscriptionMutation.mutateAsync(id),
+    refetch: () => subscriptionsQuery.refetch(),
   };
 }

@@ -1,37 +1,45 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
-import type { BudgetVsActual, MonthlyBudget } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import { BudgetVsActualListSchema } from '@/lib/schemas';
+import type { MonthlyBudget } from '@/lib/schemas';
 
 export function useMonthlyBudgets(yearMonth: string) {
-  const [budgets, setBudgets] = useState<BudgetVsActual[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchBudgets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<BudgetVsActual[]>(`/api/v1/budgets/monthly?year_month=${yearMonth}`);
-      setBudgets(data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [yearMonth]);
+  const budgetsQuery = useQuery({
+    queryKey: queryKeys.monthlyBudgets.list(yearMonth),
+    queryFn: () =>
+      api.getWithSchema(
+        `/api/v1/budgets/monthly?year_month=${yearMonth}`,
+        BudgetVsActualListSchema,
+      ),
+  });
 
-  useEffect(() => {
-    fetchBudgets();
-  }, [fetchBudgets]);
+  const upsertBudgetMutation = useMutation({
+    mutationFn: (input: { category: string; amount: number; yearMonth: string }) =>
+      api.post<MonthlyBudget>('/api/v1/budgets/monthly', input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.monthlyBudgets.all });
+    },
+  });
 
-  const upsertBudget = useCallback(async (input: { category: string; amount: number; yearMonth: string }) => {
-    await api.post<MonthlyBudget>('/api/v1/budgets/monthly', input);
-    fetchBudgets();
-  }, [fetchBudgets]);
+  const deleteBudgetMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/budgets/monthly/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.monthlyBudgets.all });
+    },
+  });
 
-  const deleteBudget = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/budgets/monthly/${id}`);
-    setBudgets((prev) => prev.filter((b) => b.category !== id));
-    fetchBudgets();
-  }, [fetchBudgets]);
+  const budgets = budgetsQuery.data ?? [];
+  const loading = budgetsQuery.isLoading;
 
-  return { budgets, loading, upsertBudget, deleteBudget, refetch: fetchBudgets };
+  return {
+    budgets,
+    loading,
+    upsertBudget: (input: { category: string; amount: number; yearMonth: string }) =>
+      upsertBudgetMutation.mutateAsync(input),
+    deleteBudget: (id: string) => deleteBudgetMutation.mutateAsync(id),
+    refetch: () => budgetsQuery.refetch(),
+  };
 }
