@@ -6,7 +6,7 @@ import {
   SavingsGoalWithProgressListSchema,
   SavingsGoalWithProgressSchema,
 } from '@/lib/schemas';
-import type { SavingsGoalWithProgress } from '@/types';
+import type { SavingsGoalWithProgress } from '@/lib/schemas';
 
 export function useSavings() {
   const queryClient = useQueryClient();

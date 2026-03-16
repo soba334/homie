@@ -26,8 +26,8 @@ export function useCalendar() {
     setRange({ start, end });
   }, []);
 
-  const refetch = useCallback(() => {
-    eventsQuery.refetch();
+  const refetch = useCallback(async () => {
+    await eventsQuery.refetch();
   }, [eventsQuery]);
 
   const addEventMutation = useMutation({
@@ -101,5 +101,6 @@ export function useCalendar() {
     toggleTask: (id: string) => toggleTaskMutation.mutateAsync(id),
     getEventsForDate,
     upcomingTasks,
+    refetch,
   };
 }
