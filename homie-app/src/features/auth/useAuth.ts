@@ -1,27 +1,11 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { api, API_BASE, ApiError } from '@/utils/api';
+import { useCallback, createContext, useContext } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, API_BASE } from '@/utils/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { MeResponseSchema } from '@/lib/schemas';
+import type { MeResponse } from '@/lib/schemas';
 
-export interface HomeMember {
-  id: string;
-  name: string;
-  displayName?: string;
-  email: string;
-  avatarUrl?: string;
-  role: string;
-}
-
-interface MeResponse {
-  id: string;
-  email: string;
-  name: string;
-  displayName?: string;
-  avatarUrl?: string;
-  home?: {
-    id: string;
-    name: string;
-    members: HomeMember[];
-  };
-}
+export type { HomeMember } from '@/lib/schemas/auth';
 
 interface AuthContextType {
   user: MeResponse | null;
@@ -40,35 +24,14 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function useAuthProvider() {
-  const [user, setUser] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchMe = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<MeResponse>('/api/v1/auth/me');
-      setUser(data);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        // Try refresh
-        try {
-          await api.post('/api/v1/auth/refresh');
-          const data = await api.get<MeResponse>('/api/v1/auth/me');
-          setUser(data);
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchMe();
-  }, [fetchMe]);
+  const { data: user, isLoading: loading, refetch } = useQuery({
+    queryKey: queryKeys.auth.me(),
+    queryFn: () => api.getWithSchema('/api/v1/auth/me', MeResponseSchema),
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
 
   const login = useCallback(() => {
     window.location.href = `${API_BASE}/api/v1/auth/google`;
@@ -80,10 +43,14 @@ export function useAuthProvider() {
     } catch {
       // ignore
     }
-    setUser(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
-  return { user, loading, login, logout, refetchMe: fetchMe };
+  const refetchMe = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  return { user: user ?? null, loading, login, logout, refetchMe };
 }
 
 export function useAuth() {

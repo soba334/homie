@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback, useMemo } from 'react';
 import { api } from '@/utils/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { DocumentListSchema, DocumentSchema } from '@/lib/schemas';
 import type { Document } from '@/types';
 
 const categoryLabels: Record<string, string> = {
@@ -10,24 +13,53 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function useDocuments() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchDocuments = useCallback(async (search?: string, category?: string) => {
+  const buildPath = (search?: string) => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    if (category) params.set('category', category);
     const query = params.toString();
-    const data = await api.get<Document[]>(`/api/v1/documents${query ? `?${query}` : ''}`);
-    setDocuments(data);
-  }, []);
+    return `/api/v1/documents${query ? `?${query}` : ''}`;
+  };
 
-  useEffect(() => {
-    setLoading(true);
-    fetchDocuments()
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [fetchDocuments]);
+  const documentsQuery = useQuery({
+    queryKey: [...queryKeys.documents.list(), searchQuery],
+    queryFn: () =>
+      api.getWithSchema(buildPath(searchQuery || undefined), DocumentListSchema),
+  });
+
+  const documents = useMemo(() => documentsQuery.data ?? [], [documentsQuery.data]);
+  const loading = documentsQuery.isLoading;
+
+  const addDocumentMutation = useMutation({
+    mutationFn: (doc: {
+      title: string;
+      category: string;
+      fileUrl: string;
+      fileType: string;
+      tags: string[];
+      note?: string;
+    }) => api.postWithSchema('/api/v1/documents', DocumentSchema, doc),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
+    },
+  });
+
+  const updateDocumentMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Document> }) =>
+      api.putWithSchema(`/api/v1/documents/${id}`, DocumentSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/documents/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all });
+    },
+  });
 
   const addDocument = useCallback(async (doc: {
     title: string;
@@ -37,33 +69,20 @@ export function useDocuments() {
     tags: string[];
     note?: string;
   }): Promise<Document> => {
-    const created = await api.post<Document>('/api/v1/documents', doc);
-    setDocuments((prev) => [created, ...prev]);
-    return created;
-  }, []);
+    return addDocumentMutation.mutateAsync(doc);
+  }, [addDocumentMutation]);
 
   const updateDocument = useCallback(async (id: string, updates: Partial<Document>) => {
-    const updated = await api.put<Document>(`/api/v1/documents/${id}`, updates);
-    setDocuments((prev) => prev.map((d) => (d.id === id ? updated : d)));
-  }, []);
+    await updateDocumentMutation.mutateAsync({ id, updates });
+  }, [updateDocumentMutation]);
 
   const deleteDocument = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/documents/${id}`);
-    setDocuments((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+    await deleteDocumentMutation.mutateAsync(id);
+  }, [deleteDocumentMutation]);
 
   const searchDocuments = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      await fetchDocuments();
-      return;
-    }
-    setLoading(true);
-    try {
-      await fetchDocuments(query);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchDocuments]);
+    setSearchQuery(query.trim() ? query : '');
+  }, []);
 
   const groupedByCategory = useMemo(() => {
     const groups: Record<string, Document[]> = {};

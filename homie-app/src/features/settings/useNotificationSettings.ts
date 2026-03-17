@@ -1,5 +1,8 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
+import { queryKeys } from '@/lib/queryKeys';
+import { NotificationPreferencesSchema } from '@/lib/schemas';
 import {
   registerServiceWorker,
   subscribePush,
@@ -8,29 +11,16 @@ import {
   getCurrentSubscription,
 } from '@/utils/pushNotification';
 
-interface NotificationPreferences {
-  userId: string;
-  garbageEnabled: boolean;
-  garbageTiming: 'eve' | 'day' | 'both';
-  subscriptionEnabled: boolean;
-  subscriptionDaysBefore: number;
-  updatedAt: string;
-}
-
 export function useNotificationSettings() {
+  const queryClient = useQueryClient();
   const [supported] = useState(isPushSupported);
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [subscribed, setSubscribed] = useState(false);
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-  const [loading, setLoading] = useState(true);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
     const init = async () => {
-      if (!isPushSupported()) {
-        setLoading(false);
-        return;
-      }
+      if (!isPushSupported()) return;
       setPermission(Notification.permission);
       const reg = await registerServiceWorker();
       setRegistration(reg);
@@ -38,50 +28,83 @@ export function useNotificationSettings() {
         const sub = await getCurrentSubscription(reg);
         setSubscribed(!!sub);
       }
-      try {
-        const prefs = await api.get<NotificationPreferences>('/api/v1/push/preferences');
-        setPreferences(prefs);
-      } catch {
-        // use defaults
-      }
-      setLoading(false);
     };
     init();
   }, []);
 
+  const preferencesQuery = useQuery({
+    queryKey: queryKeys.notifications.preferences(),
+    queryFn: () => api.getWithSchema('/api/v1/push/preferences', NotificationPreferencesSchema),
+    enabled: isPushSupported(),
+  });
+
+  const preferences = preferencesQuery.data ?? null;
+  const loading = preferencesQuery.isLoading;
+
+  const enableMutation = useMutation({
+    mutationFn: async () => {
+      if (!registration) return false;
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+      if (perm !== 'granted') return false;
+
+      const subscription = await subscribePush(registration);
+      if (!subscription) return false;
+
+      const json = subscription.toJSON();
+      await api.post('/api/v1/push/subscribe', {
+        endpoint: json.endpoint,
+        keys: json.keys,
+      });
+      setSubscribed(true);
+      return true;
+    },
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: async () => {
+      if (!registration) return;
+      const subscription = await getCurrentSubscription(registration);
+      if (subscription) {
+        await api.post('/api/v1/push/unsubscribe', { endpoint: subscription.endpoint });
+        await unsubscribePush(registration);
+      }
+      setSubscribed(false);
+    },
+  });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: (updates: Partial<{
+      userId: string;
+      garbageEnabled: boolean;
+      garbageTiming: 'eve' | 'day' | 'both';
+      subscriptionEnabled: boolean;
+      subscriptionDaysBefore: number;
+      updatedAt: string;
+    }>) => api.putWithSchema('/api/v1/push/preferences', NotificationPreferencesSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences() });
+    },
+  });
+
   const enableNotifications = useCallback(async () => {
-    if (!registration) return false;
-    const perm = await Notification.requestPermission();
-    setPermission(perm);
-    if (perm !== 'granted') return false;
-
-    const subscription = await subscribePush(registration);
-    if (!subscription) return false;
-
-    const json = subscription.toJSON();
-    await api.post('/api/v1/push/subscribe', {
-      endpoint: json.endpoint,
-      keys: json.keys,
-    });
-    setSubscribed(true);
-    return true;
-  }, [registration]);
+    return enableMutation.mutateAsync();
+  }, [enableMutation]);
 
   const disableNotifications = useCallback(async () => {
-    if (!registration) return;
-    const subscription = await getCurrentSubscription(registration);
-    if (subscription) {
-      await api.post('/api/v1/push/unsubscribe', { endpoint: subscription.endpoint });
-      await unsubscribePush(registration);
-    }
-    setSubscribed(false);
-  }, [registration]);
+    await disableMutation.mutateAsync();
+  }, [disableMutation]);
 
-  const updatePreferences = useCallback(async (updates: Partial<NotificationPreferences>) => {
-    const updated = await api.put<NotificationPreferences>('/api/v1/push/preferences', updates);
-    setPreferences(updated);
-    return updated;
-  }, []);
+  const updatePreferences = useCallback(async (updates: Partial<{
+    userId: string;
+    garbageEnabled: boolean;
+    garbageTiming: 'eve' | 'day' | 'both';
+    subscriptionEnabled: boolean;
+    subscriptionDaysBefore: number;
+    updatedAt: string;
+  }>) => {
+    return updatePreferencesMutation.mutateAsync(updates);
+  }, [updatePreferencesMutation]);
 
   return {
     supported,

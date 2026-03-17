@@ -1,71 +1,86 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useCallback } from 'react';
 import { api } from '@/utils/api';
-import type { CalendarEvent } from '@/types';
+import { queryKeys } from '@/lib/queryKeys';
+import {
+  CalendarEventListSchema,
+  CalendarEventSchema,
+} from '@/lib/schemas';
+import type { CalendarEvent } from '@/lib/schemas';
 
 export function useCalendar() {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const rangeRef = useRef<{ start: string; end: string } | null>(null);
+  const queryClient = useQueryClient();
+  const [range, setRange] = useState<{ start: string; end: string } | null>(null);
 
-  const fetchEvents = useCallback(async (start: string, end: string) => {
-    rangeRef.current = { start, end };
-    setLoading(true);
-    try {
-      const data = await api.get<CalendarEvent[]>(
-        `/api/v1/calendar/events?start=${start}&end=${end}`,
-      );
-      setEvents(data);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
+  const eventsQuery = useQuery({
+    queryKey: queryKeys.calendar.events(range?.start, range?.end),
+    queryFn: () =>
+      api.getWithSchema(
+        `/api/v1/calendar/events?start=${range!.start}&end=${range!.end}`,
+        CalendarEventListSchema,
+      ),
+    enabled: range !== null,
+  });
+
+  const fetchEvents = useCallback((start: string, end: string) => {
+    setRange({ start, end });
   }, []);
 
-  const refetch = useCallback(() => {
-    if (rangeRef.current) {
-      fetchEvents(rangeRef.current.start, rangeRef.current.end);
-    }
-  }, [fetchEvents]);
+  const refetch = useCallback(async () => {
+    await eventsQuery.refetch();
+  }, [eventsQuery]);
 
-  const addEvent = useCallback(async (event: {
-    title: string;
-    date: string;
-    endDate?: string;
-    allDay: boolean;
-    type: string;
-    assignee?: string;
-    completed?: boolean;
-    color?: string;
-    description?: string;
-    recurrenceRule?: string;
-    recurrenceInterval?: number;
-    recurrenceEnd?: string;
-  }) => {
-    await api.post<CalendarEvent>('/api/v1/calendar/events', event);
-    refetch();
-  }, [refetch]);
+  const addEventMutation = useMutation({
+    mutationFn: (event: {
+      title: string;
+      date: string;
+      endDate?: string;
+      allDay: boolean;
+      type: string;
+      assignee?: string;
+      completed?: boolean;
+      color?: string;
+      description?: string;
+      recurrenceRule?: string;
+      recurrenceInterval?: number;
+      recurrenceEnd?: string;
+    }) => api.postWithSchema('/api/v1/calendar/events', CalendarEventSchema, event),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    },
+  });
 
-  const updateEvent = useCallback(async (id: string, updates: Partial<CalendarEvent>) => {
-    await api.put<CalendarEvent>(`/api/v1/calendar/events/${id}`, updates);
-    refetch();
-  }, [refetch]);
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<CalendarEvent> }) =>
+      api.putWithSchema(`/api/v1/calendar/events/${id}`, CalendarEventSchema, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    },
+  });
 
-  const deleteEvent = useCallback(async (id: string) => {
-    await api.delete(`/api/v1/calendar/events/${id}`);
-    setEvents((prev) => prev.filter((e) => e.id !== id));
-  }, []);
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/calendar/events/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    },
+  });
 
-  const toggleTask = useCallback(async (id: string) => {
-    await api.patch(`/api/v1/calendar/events/${id}/toggle`);
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, completed: !e.completed } : e)),
-    );
-  }, []);
+  const toggleTaskMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/api/v1/calendar/events/${id}/toggle`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+    },
+  });
 
-  const getEventsForDate = useCallback((dateStr: string) => {
-    return events.filter((e) => e.date === dateStr);
-  }, [events]);
+  const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const loading = eventsQuery.isLoading;
+
+  const getEventsForDate = useCallback(
+    (dateStr: string) => {
+      return events.filter((e) => e.date === dateStr);
+    },
+    [events],
+  );
 
   const upcomingTasks = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -78,11 +93,14 @@ export function useCalendar() {
     events,
     loading,
     fetchEvents,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    toggleTask,
+    addEvent: (event: Parameters<typeof addEventMutation.mutateAsync>[0]) =>
+      addEventMutation.mutateAsync(event),
+    updateEvent: (id: string, updates: Partial<CalendarEvent>) =>
+      updateEventMutation.mutateAsync({ id, updates }),
+    deleteEvent: (id: string) => deleteEventMutation.mutateAsync(id),
+    toggleTask: (id: string) => toggleTaskMutation.mutateAsync(id),
     getEventsForDate,
     upcomingTasks,
+    refetch,
   };
 }
